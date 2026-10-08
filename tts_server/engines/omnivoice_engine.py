@@ -30,9 +30,12 @@ class OmniVoiceEngine(Engine):
         from omnivoice import OmniVoice
 
         self.torch = torch
+        device, dtype = self.cfg.get("device", "cuda:0"), self.cfg.get("dtype", "float16")
+        if device.startswith("cuda") and not torch.cuda.is_available():
+            log.warning("sem GPU CUDA; usando a CPU (bem mais lento)")
+            device, dtype = "cpu", "float32"  # float16 is GPU-only in practice
         self.model = OmniVoice.from_pretrained(self.cfg.get("model", "k2-fsa/OmniVoice"),
-                                               device_map=self.cfg.get("device", "cuda:0"),
-                                               dtype=getattr(torch, self.cfg.get("dtype", "float16")))
+                                               device_map=device, dtype=getattr(torch, dtype))
         self._prompts: dict[tuple[str, float], object] = {}
         self._languages = self._language_options()
 

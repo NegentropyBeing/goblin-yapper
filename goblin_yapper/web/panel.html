@@ -38,12 +38,17 @@
   .spacer { flex: 1; }
 
   #voicebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
-  #speaker { display: flex; align-items: center; gap: 10px; min-width: 240px; padding: 6px 14px; border-radius: var(--radius);
-    background: var(--panel); border: 1px solid var(--line); }
-  #speaker .who { font-weight: 700; font-size: 16px; }
-  #speaker .team { font-size: 12px; color: var(--muted); }
-  #speaker .mic { font-size: 20px; opacity: .4; }
-  #speaker.talking .mic { opacity: 1; animation: pulse .5s infinite alternate; }
+  #speakers { display: flex; flex-wrap: wrap; gap: 8px; }
+  .spk { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-radius: var(--radius);
+    background: var(--panel); border: 1px solid var(--team, var(--line)); min-width: 180px; }
+  .spk .who { font-weight: 700; font-size: 15px; }
+  .spk .team { font-size: 12px; color: var(--team, var(--muted)); }
+  .spk .mic { font-size: 18px; opacity: .4; }
+  .spk.talking .mic { opacity: 1; animation: pulse .5s infinite alternate; }
+  .spk.empty { color: var(--muted); border-style: dashed; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .toggle input { accent-color: var(--accent); }
+  .voice-acts { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
   @keyframes pulse { to { transform: scale(1.2); } }
   #test { display: flex; gap: 6px; margin-left: auto; }
   #test input { width: 220px; }
@@ -103,7 +108,10 @@
   #tab-voz { overflow: auto; }
   #vzStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
   #vzStatus select, .card select, .card textarea, .card input[type=number] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-  #vzBanner { margin: 12px 16px 0; padding: 10px 14px; border-radius: var(--radius); border: 1px solid #f59e0b; background: #f59e0b14; white-space: pre-wrap; }
+  #vzBanner { margin: 12px 16px 0; padding: 12px 14px; border-radius: var(--radius); border: 1px solid #f59e0b; background: #f59e0b14; }
+  #vzBanner code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .vz-log { margin: 8px 0 0; max-height: 160px; overflow: auto; background: var(--bg); border-radius: 6px; padding: 8px;
+    font-size: 11px; color: var(--muted); white-space: pre-wrap; word-break: break-all; }
   #vzGrid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; padding: 12px 16px; align-items: start; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .card h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
@@ -191,10 +199,12 @@
 
 <div class="tab" id="tab-goblin">
 <section id="voicebar">
-  <div id="speaker"><span class="mic">🎤</span><div><div class="who" id="speakerName">ninguém com a voz</div><div class="team" id="speakerTeam">escolha um time ou uma pessoa</div></div></div>
-  <button data-cmd="next" id="nextBtn" title="Outra pessoa do mesmo time">Próximo do time</button>
+  <div id="speakers"></div>
+  <label class="toggle" title="Cada time pode ter alguém com a voz ao mesmo tempo; as falas tocam uma de cada vez">
+    <input type="checkbox" id="multiVoice"> vários times ao mesmo tempo</label>
+  <button data-cmd="next" id="nextBtn" title="Outra pessoa do mesmo time do último sorteado">Próximo do time</button>
   <button data-cmd="voice any" title="Qualquer time">Aleatório geral</button>
-  <button class="danger" data-cmd="stop">Parar voz</button>
+  <button class="danger" data-cmd="stop" id="stopAllBtn">Parar voz</button>
   <form id="test"><input type="text" id="testText" placeholder="testar TTS no goblin do time…"><button>Falar</button></form>
 </section>
 
@@ -362,11 +372,10 @@ function render() {
   const teams = Object.keys(state.teams);
   $("#teamCount").innerHTML = [1, 2, 3, 4].map(n => `<button class="${n === teams.length ? "on" : ""}" data-teams="${n}">${n}</button>`).join("");
 
-  const v = state.voice;
-  $("#speakerName").textContent = v.user || "ninguém com a voz";
-  $("#speakerTeam").textContent = v.user ? (v.team ? `time ${v.team}` : "sem time") : "escolha um time ou uma pessoa";
-  $("#speaker").style.borderColor = v.team ? teamColor(v.team) : "";
-  $("#nextBtn").disabled = !v.user;
+  renderSpeakers();
+  $("#multiVoice").checked = state.multi_voice;
+  $("#nextBtn").disabled = !state.voice.user;
+  $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? "Parar todos" : "Parar voz";
 
   renderBoard(teams);
   renderUrls(teams);
@@ -395,7 +404,14 @@ function renderBoard(teams) {
       $(".tint-strength", col).value = Math.round(tint.strength * 100);
     }
     $(".count", col).textContent = state.teams[t].length;
-    $(".voice-btn", col).disabled = state.teams[t].length === 0;
+    // per-team voice buttons: draw a speaker, or next/stop when the team already has one
+    const hasSpeaker = (state.speakers || []).some(sp => sp.team === t);
+    const empty = state.teams[t].length === 0 ? "disabled" : "";
+    const acts = hasSpeaker
+      ? `<button data-cmd="next ${t}" ${state.teams[t].length < 2 ? "disabled" : ""} title="Outra pessoa deste time">⏭ Próximo</button>
+         <button class="danger" data-cmd="stop ${t}" title="Tirar a voz deste time">⏹ Parar</button>`
+      : `<button data-cmd="voice ${t}" ${empty}>🎤 Sortear voz</button>`;
+    if ($(".voice-acts", col).innerHTML !== acts) $(".voice-acts", col).innerHTML = acts;
     fillMembers(col, state.teams[t], "vazio");
   }
 }
@@ -407,7 +423,7 @@ function colHtml(id, title, isTeam) {
         ${isTeam ? `<iframe class="preview" src="/overlay?team=${id}&audio=0&label=0&size=64" tabindex="-1"></iframe>` : ""}
         <div style="flex:1;min-width:0">
           <div class="col-title"><h2>${esc(title)}</h2><span class="count">0</span></div>
-          ${isTeam ? `<button class="voice-btn" data-cmd="voice ${id}" style="margin-top:6px">🎤 Sortear voz</button>` : ""}
+          ${isTeam ? `<div class="voice-acts"></div>` : ""}
         </div>
       </div>
       ${isTeam ? `<div class="tint" title="Tinta do goblin">tinta <input type="color" class="tint-color" data-team="${id}">
@@ -419,9 +435,9 @@ function colHtml(id, title, isTeam) {
 }
 
 function fillMembers(col, people) {
-  const activeId = state.voice.id;
+  const speakerIds = new Set((state.speakers || []).map(sp => sp.id));
   $(".members", col).innerHTML = people.map(p => `
-    <li class="chip ${p.id === activeId ? "active" : ""}" draggable="true" data-user="${esc(p.id)}">
+    <li class="chip ${speakerIds.has(p.id) ? "active" : ""}" draggable="true" data-user="${esc(p.id)}">
       <span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
       <span class="acts">
         <button class="icon" data-cmd="give ${esc(p.id)}" title="Dar a voz">🎤</button>
@@ -430,8 +446,24 @@ function fillMembers(col, people) {
     </li>`).join("");
 }
 
+let talkingTeam = undefined;  // team of the line playing now (null = no team), undefined = silence
 function setTalking(team, talking) {
-  $("#speaker").classList.toggle("talking", talking);
+  talkingTeam = talking ? team : undefined;
+  document.querySelectorAll(".spk[data-team]").forEach(el =>
+    el.classList.toggle("talking", talking && el.dataset.team === String(team ?? "")));
+}
+
+function renderSpeakers() {
+  const list = state.speakers || [];
+  $("#speakers").innerHTML = list.length ? list.map(sp => `
+    <div class="spk ${talkingTeam !== undefined && (talkingTeam ?? "") === (sp.team ?? "") ? "talking" : ""}"
+         data-team="${esc(sp.team ?? "")}" style="--team:${sp.team ? teamColor(sp.team) : "var(--line)"}">
+      <span class="mic">🎤</span>
+      <div style="flex:1;min-width:0"><div class="who">${esc(sp.user)}</div><div class="team">${sp.team ? `time ${esc(sp.team)}` : "sem time"}</div></div>
+      <button class="icon danger" data-cmd="stop ${esc(sp.id)}" title="Tirar a voz de ${esc(sp.user)}">✕</button>
+    </div>`).join("")
+    : `<div class="spk empty"><span class="mic">🎤</span><div><div class="who">ninguém com a voz</div>
+         <div class="team">escolha um time ou uma pessoa</div></div></div>`;
 }
 
 function renderUrls(teams) {
@@ -477,6 +509,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+$("#multiVoice").addEventListener("change", (e) => cmd(`multivoice ${e.target.checked ? "on" : "off"}`));
 $("#channel").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#channelBtn").click(); });
 $("#channel").addEventListener("input", () => render());
 
@@ -571,13 +604,34 @@ async function vzPoll() {
   if (!vz.loaded) { vz.loaded = true; await vzLoadAll(); }
 }
 
+// First-run install of the voice runtime (installed app). Returns banner HTML.
+function installBanner(st) {
+  const ins = st.install || {};
+  if (ins.state === "running") {
+    const cur = ins.steps.findIndex(s => s.id === ins.step);
+    return `<b>Instalando o servidor de voz…</b> <span class="hint">${ins.elapsed ?? 0}s · pode levar 10–20 min, dependendo da internet</span>
+      <ol class="vz-steps" style="margin-top:8px">${ins.steps.map((s, i) =>
+        `<li class="${i < cur ? "done" : i === cur ? "running" : ""}">${esc(s.label)}</li>`).join("")}</ol>
+      <pre class="vz-log">${esc((ins.log || []).join("\n"))}</pre>`;
+  }
+  const retry = ins.state === "error"
+    ? `<p style="color:#fca5a5;margin:8px 0">A instalação falhou: ${esc(ins.error)}</p>` : "";
+  return `<b>O servidor de voz (OmniVoice) ainda não está instalado.</b>
+    <p class="hint" style="margin:6px 0">A instalação baixa ~3,5 GB (Python, PyTorch com CUDA e OmniVoice; ~8 GB no disco) para
+      <code>${esc(ins.dir || "")}</code>. Ao iniciar pela primeira vez, o modelo de voz (~3 GB) também é baixado.
+      Precisa de uma GPU NVIDIA para ficar rápido.</p>${retry}
+    <button class="primary" id="vzInstall">${ins.state === "error" ? "Tentar de novo" : "Instalar servidor de voz"}</button>`;
+}
+
 function renderVzStatus() {
   const st = vz.status, sv = st.server || {};
   let dot = "", text, banner = "";
-  if (st.mode === "not_installed") {
+  if (st.install?.state === "running") { dot = "warn"; text = "instalando servidor de voz…"; banner = installBanner(st); }
+  else if (st.mode === "not_installed" && st.can_install) { dot = "bad"; text = "servidor de voz não instalado"; banner = installBanner(st); }
+  else if (st.mode === "not_installed") {
     dot = "bad"; text = "servidor de voz não instalado";
-    banner = "O ambiente do servidor de voz (PyTorch + OmniVoice) não foi encontrado.\nInstale com  tts_server\\setup.ps1  e depois clique em Reiniciar servidor.";
-  } else if (st.mode === "exited") { dot = "bad"; text = "o servidor de voz parou"; banner = `Veja o log: ${st.log}`; }
+    banner = "O ambiente do servidor de voz (PyTorch + OmniVoice) não foi encontrado.<br>Instale com <code>tts_server\\setup.ps1</code> e depois clique em Reiniciar servidor.";
+  } else if (st.mode === "exited") { dot = "bad"; text = "o servidor de voz parou"; banner = `Veja o log: <code>${esc(st.log)}</code>`; }
   else if (st.mode === "offline") { dot = "bad"; text = "sem conexão com o app"; }
   else if (st.mode === "stopped" || st.mode === "disabled") { text = "servidor de voz parado"; }
   else if (sv.state === "ready") {
@@ -585,12 +639,12 @@ function renderVzStatus() {
     text = [sv.label, "pronto", sv.gpu, sv.vram_used_gb != null ? `VRAM ${sv.vram_used_gb}/${sv.vram_total_gb} GB` : "",
             sv.asr_loaded ? "Whisper carregado" : "", sv.busy ? `${sv.busy}…` : "",
             st.mode === "external" ? "iniciado fora do app" : ""].filter(Boolean).join(" · ");
-  } else if (sv.state === "error") { dot = "bad"; text = "erro ao carregar o modelo"; banner = `${sv.error}\nLog: ${st.log}`; }
-  else { dot = "warn"; text = "carregando modelo de voz…"; }
+  } else if (sv.state === "error") { dot = "bad"; text = "erro ao carregar o modelo"; banner = `${esc(sv.error)}<br>Log: <code>${esc(st.log)}</code>`; }
+  else { dot = "warn"; text = "carregando modelo de voz… (a primeira vez baixa ~3 GB)"; }
   $("#vzDot").className = "dot " + dot;
   $("#vzStatusText").textContent = text;
   $("#vzBanner").hidden = !banner;
-  $("#vzBanner").textContent = banner;
+  if ($("#vzBanner").innerHTML !== banner) $("#vzBanner").innerHTML = banner;
   $("#vzRestart").disabled = st.mode === "external";
   $("#vzDrop").classList.toggle("disabled", sv.state !== "ready");
   $("#vzSpeak").disabled = sv.state !== "ready";
@@ -881,6 +935,12 @@ $("#vzSave").addEventListener("click", vzSave);
 $("#vzSpeak").addEventListener("click", vzSpeak);
 $("#vzCreate").addEventListener("click", vzCreate);
 $("#vzCancel").addEventListener("click", resetPipeline);
+$("#vzBanner").addEventListener("click", async (e) => {
+  if (e.target.id !== "vzInstall") return;
+  e.target.disabled = true;
+  try { vz.status = await api("/api/tts-service/install", { method: "POST" }); renderVzStatus(); }
+  catch (err) { toast(err.message, true); e.target.disabled = false; }
+});
 $("#vzRestart").addEventListener("click", async () => {
   if (!confirm("Reiniciar o servidor de voz? O modelo será recarregado.")) return;
   try { vz.status = await api("/api/tts-service/restart", { method: "POST" }); vz.loaded = false; renderVzStatus(); toast("servidor de voz reiniciando"); }

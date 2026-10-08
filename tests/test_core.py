@@ -234,3 +234,79 @@ def test_teamvoice_and_engine_commands(tmp_path):
         assert again.tts.team_profiles == {"default": "narrador-2"}
 
     asyncio.run(run())
+
+
+def _two_team_app(multi):
+    app = App({"teams": {"count": 2}, "voice": {"multi": multi}}, TTS({"engine": "dummy"}))
+    app.sorter.queue_open = True
+    for u in ("a1", "a2", "v1", "v2"):
+        app.sorter.join(u)
+    app.sorter.queue.clear()
+    app.sorter.teams = {"azul": ["a1", "a2"], "verde": ["v1", "v2"]}
+    app.sorter.sorted = True
+    return app
+
+
+def test_single_mode_one_speaker_total():
+    async def run():
+        app = _two_team_app(multi=False)
+        await app.command("voice azul")
+        await app.command("voice verde")
+        assert [t for _, t in app.voice.speakers()] == ["verde"]
+
+    asyncio.run(run())
+
+
+def test_multi_mode_one_speaker_per_team():
+    async def run():
+        app = _two_team_app(multi=True)
+        await app.command("voice azul")
+        await app.command("voice verde")
+        speakers = dict((t, u) for u, t in app.voice.speakers())
+        assert set(speakers) == {"azul", "verde"}
+        assert [s["team"] for s in app.state()["speakers"]] == ["azul", "verde"]
+
+        # both speakers are read; a non-speaker isn't
+        await app.on_chat(ChatMessage(speakers["azul"], "A", "oi do azul", {}))
+        await app.on_chat(ChatMessage(speakers["verde"], "V", "oi do verde", {}))
+        other = next(u for u in ("a1", "a2") if u != speakers["azul"])
+        await app.on_chat(ChatMessage(other, "X", "não falo", {}))
+        assert app.speech_q.qsize() == 2
+
+        # next on azul replaces only azul's speaker
+        await app.command("next azul")
+        assert app.voice.speaker_of("azul") == other
+        assert app.voice.speaker_of("verde") == speakers["verde"]
+        # the old azul speaker's queued line was dropped, verde's kept
+        assert [u.user for u in app.speech_q._queue] == [speakers["verde"]]
+
+        # stop one team, then everyone
+        assert (await app.command("stop verde")).startswith("voz retirada de")
+        assert [t for _, t in app.voice.speakers()] == ["azul"]
+        await app.command("stop")
+        assert app.voice.speakers() == [] and app.speech_q.qsize() == 0
+
+    asyncio.run(run())
+
+
+def test_multivoice_toggle_and_per_speaker_queue_limit(tmp_path):
+    async def run():
+        settings = tmp_path / "settings.json"
+        app = App({"teams": {"count": 2}, "tts": {"max_queue": 2}}, TTS({"engine": "dummy"}), settings_path=settings)
+        app.sorter.teams = {"azul": ["a1"], "verde": ["v1"]}
+        await app.command("multivoice on")
+        await app.command("give a1")
+        await app.command("give v1")
+        for i in range(4):
+            await app.on_chat(ChatMessage("a1", "A", f"azul {i}", {}))
+        await app.on_chat(ChatMessage("v1", "V", "verde ainda fala", {}))
+        # a1 is capped at 2 queued lines, v1 still gets in
+        assert [u.user for u in app.speech_q._queue] == ["a1", "a1", "v1"]
+        assert json.loads(settings.read_text(encoding="utf-8"))["voice"]["multi"] is True
+
+        await app.command("multivoice off")  # keeps only the most recent speaker
+        assert app.voice.users == ["v1"]
+        assert [u.user for u in app.speech_q._queue] == ["v1"]
+        assert (await app.command("multivoice talvez")).startswith("erro")
+
+    asyncio.run(run())

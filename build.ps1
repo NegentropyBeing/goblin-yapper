@@ -19,10 +19,13 @@ Write-Host "==> testes" -ForegroundColor Cyan
 Write-Host "==> backend (PyInstaller)" -ForegroundColor Cyan
 $triple = ((rustc -vV) | Select-String "^host:").ToString().Split(" ")[1]
 $pkg = Join-Path $root "goblin_yapper"
+$tts = Join-Path $root "tts_server"  # only its code is bundled; the voice runtime installs on first use
 & $py -m PyInstaller --noconfirm --clean --onefile --noconsole `
     --name "goblin-yapper-server-$triple" `
     --add-data "$pkg\web;goblin_yapper\web" `
     --add-data "$pkg\default_config.toml;goblin_yapper" `
+    --add-data "$tts\server.py;tts_server" --add-data "$tts\audio.py;tts_server" `
+    --add-data "$tts\requirements.txt;tts_server" --add-data "$tts\engines\*.py;tts_server\engines" `
     --distpath (Join-Path $root "app\src-tauri\binaries") `
     --workpath (Join-Path $root "build") --specpath (Join-Path $root "build") `
     (Join-Path $root "run_server.py")

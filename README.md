@@ -87,10 +87,16 @@ Installed app:
 - the window is the operator panel (`/panel`): drag chatters between teams, voice buttons, tint pickers,
   goblin image upload, OBS overlay URLs to copy.
 - user data lives in `%APPDATA%\com.goblinyapper.desktop\` — `config.toml`, `settings.json` (panel changes),
-  `assets\`, `voices\`, `scripts\`, `goblin-yapper.log`.
-- the bundled backend doesn't start the TTS server yet (it looks for `tts_server\.venv` next to the source).
-  For the OmniVoice voice, start the backend from source (see Setup and run) **before** opening the app: it
-  detects the server on port 8765 and attaches to it instead of starting its own.
+  `assets\`, `tts\` (voice profiles, TTS server log), `goblin-yapper.log`.
+- **voice, first run**: the installer is small and only ships the TTS server's code. On the **Voz** tab,
+  click **Instalar servidor de voz**: it downloads [uv](https://github.com/astral-sh/uv) (pinned, checksum
+  verified), a standalone Python 3.13, PyTorch with CUDA 12.8 and OmniVoice (~3.5 GB download, ~8 GB on disk) into
+  `%LOCALAPPDATA%\GoblinYapper\voice-runtime\`, then starts the server. The voice model (~3 GB) downloads to
+  the Hugging Face cache the first time the server starts. No system Python is needed.
+- uninstalling the app keeps the voice runtime and your data; delete `%LOCALAPPDATA%\GoblinYapper\` and
+  `%APPDATA%\com.goblinyapper.desktop\` to remove them.
+- a backend run from source still works alongside: start it **before** opening the app and the app attaches to
+  it on port 8765 instead of starting its own.
 
 ## Twitch chat commands
 
@@ -128,9 +134,10 @@ a terminal) and the HTTP API all use these same commands. `<time>` is `azul`, `v
 | `remove <user>` | Take someone out completely |
 | `voice <time>` | Give the voice to a random person on that team |
 | `voice any` | Give the voice to a random person on any team |
-| `voice` / `next` | Another person from the same team as the current speaker |
+| `voice` / `next [time]` | Another person from that team (default: the last speaker's team) |
 | `give <user>` | Give the voice to a specific person (they don't need to be on a team) |
-| `stop` | Take the voice away and cut the audio |
+| `stop [time\|user]` | Take the voice away and cut their audio (no argument: everyone) |
+| `multivoice <on\|off>` | One speaker per team at the same time; lines still play one at a time |
 | `channel <canal\|off>` | Connect to a channel's chat (name or pasted link), or disconnect |
 | `tint <time> <#rrggbb\|off> [0-1]` | Team goblin tint color and strength |
 | `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |

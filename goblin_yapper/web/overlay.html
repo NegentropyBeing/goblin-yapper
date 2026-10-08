@@ -50,7 +50,7 @@ document.documentElement.style.setProperty("--size", (params.get("size") || 360)
 const goblinEl = document.getElementById("goblin");
 const labelEl = document.getElementById("label");
 const unlockEl = document.getElementById("unlock");
-let assets = {}, state = null, talkingTeam = null, currentId = null;
+let assets = {}, state = null, talkingTeam = null, talkingUser = null, currentId = null;
 const audio = new Audio();
 let ws;
 
@@ -98,21 +98,27 @@ function render() {
       goblinEl.querySelector(".ph").classList.toggle("talking", talking);
     }
   }
-  const showName = SHOW_LABEL && state?.voice?.user && (!PIN_TEAM || state.voice.team === PIN_TEAM);
-  labelEl.textContent = showName ? state.voice.user : "";
-  labelEl.style.background = showName && state.voice.team ? (state.tints[state.voice.team].color + "cc") : "#0008";
+  // Label: a pinned source names its own team's speaker; the main source names whoever is
+  // talking right now, else the most recent speaker. Several teams can have a speaker at once.
+  const speakers = state?.speakers || [];
+  const who = PIN_TEAM
+    ? speakers.find(sp => sp.team === PIN_TEAM)
+    : (currentId !== null && talkingUser ? { user: talkingUser, team: talkingTeam } : state?.voice);
+  const showName = SHOW_LABEL && !!who?.user;
+  labelEl.textContent = showName ? who.user : "";
+  labelEl.style.background = showName && who.team && state.tints[who.team] ? (state.tints[who.team].color + "cc") : "#0008";
   labelEl.classList.toggle("hidden", !showName);
 }
 
 function stopTalking(id) {
   if (id !== undefined && id !== currentId) return;
-  currentId = null; talkingTeam = null;
+  currentId = null; talkingTeam = null; talkingUser = null;
   if (PLAY_AUDIO) { audio.pause(); audio.removeAttribute("src"); }
   render();
 }
 
 function onSpeak(msg) {
-  currentId = msg.id; talkingTeam = msg.team;
+  currentId = msg.id; talkingTeam = msg.team; talkingUser = msg.user;
   render();
   if (!PLAY_AUDIO) return;
   audio.src = msg.url;
