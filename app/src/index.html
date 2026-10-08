@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Goblin Yapper</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #12141a; color: #e7e9ef; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  body { display: grid; place-items: center; }
+  .box { text-align: center; max-width: 520px; padding: 24px; }
+  svg { width: 200px; height: 110px; animation: bob .5s infinite alternate ease-in-out; }
+  @keyframes bob { to { transform: translateY(-6px) rotate(2deg); } }
+  h1 { font-size: 20px; margin: 12px 0 4px; } h1 span { color: #7fbf3f; }
+  p { color: #8b91a5; margin: 0; }
+  .err { color: #fca5a5; margin-top: 14px; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+<div class="box">
+  <svg viewBox="100 340 1056 576">
+  <g class="head">
+    <path fill="#45742a" d="M425 505 C380 482 260 455 128 420 C112 417 110 432 122 441 C170 480 222 515 250 545 C292 600 328 668 360 688 C375 696 395 696 402 695 C430 760 520 862 630 888 C700 890 790 800 848 697 C890 690 930 660 960 620 C1000 570 1050 512 1134 442 C1146 432 1142 417 1127 420 C1020 448 900 484 832 512 C800 442 720 378 620 377 C530 378 460 430 425 505 Z"/>
+    <ellipse cx="1014" cy="530" rx="24" ry="22" fill="#fff"/>
+    <path fill="#fff" d="M425 612 C428 565 500 535 545 560 C570 590 548 640 495 642 C455 643 425 632 425 612 Z"/>
+    <circle cx="510" cy="592" r="32" fill="#111"/><circle cx="507" cy="601" r="11" fill="#fff"/><circle cx="521" cy="578" r="5" fill="#fff"/>
+    <path fill="#fff" d="M642 578 C660 520 740 482 795 510 C820 540 805 615 740 625 C690 630 655 600 642 578 Z"/>
+    <circle cx="746" cy="553" r="35" fill="#111"/><circle cx="740" cy="565" r="12" fill="#fff"/><circle cx="759" cy="550" r="6" fill="#fff"/>
+    <path class="mouth-closed" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" d="M577 775 C595 764 615 762 640 762 C660 762 672 768 686 775"/>
+  </g>
+</svg>
+  <h1>Goblin <span>Yapper</span></h1>
+  <p id="status">iniciando o servidor…</p>
+  <p class="err" id="err"></p>
+</div>
+<script>
+  window.showError = (msg) => {
+    document.getElementById("status").textContent = "algo deu errado";
+    document.getElementById("err").textContent = msg;
+  };
+</script>
+</body>
+</html>

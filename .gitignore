@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+goblin-yapper.log
+settings.json
+build/
+dist/
+*.spec
+app/node_modules/
+app/src-tauri/target/
+app/src-tauri/binaries/
+app/src-tauri/gen/

@@ -1,0 +1,211 @@
+import asyncio
+import json
+import random
+
+import pytest
+
+from goblin_yapper.app import App, strip_emotes
+from goblin_yapper.teams import QUEUE, SorterError, TeamSorter
+from goblin_yapper.tts import TTS, wav_duration
+from goblin_yapper.twitch import ChatMessage, parse_line
+from goblin_yapper.voice import VoiceController
+
+
+def sorter(n=4, people=0, open_=True):
+    s = TeamSorter(n, rng=random.Random(1))
+    s.queue_open = open_
+    for i in range(people):
+        s.join(f"user{i}")
+    return s
+
+
+def sizes(s):
+    return sorted(len(m) for m in s.teams.values())
+
+
+def test_join_closed_and_duplicates():
+    s = sorter(open_=False)
+    assert s.join("A") == "closed"
+    s.queue_open = True
+    assert s.join("A", "A_Display") == "queued"
+    assert s.join("a") == "already"
+    assert s.snapshot()["queue"] == [{"id": "a", "name": "A_Display"}]
+
+
+def test_sort_is_balanced():
+    s = sorter(4, 10)
+    assert s.sort() == 10
+    assert sizes(s) == [2, 2, 3, 3]
+    assert s.queue == []
+
+
+def test_late_joiner_goes_to_smallest_team():
+    s = sorter(3, 5)
+    s.sort()
+    smallest = [t for t, m in s.teams.items() if len(m) == 1]
+    assert s.join("late") in smallest
+    assert sizes(s) == [2, 2, 2]
+
+
+def test_late_joiner_queued_when_auto_assign_off():
+    s = sorter(2, 2)
+    s.auto_assign_late = False
+    s.sort()
+    assert s.join("late") == "queued"
+
+
+def test_move_reset_resort_clear():
+    s = sorter(2, 4)
+    s.sort()
+    with pytest.raises(SorterError):
+        s.move("user0", "roxo")  # only azul/verde exist
+    s.move("user0", QUEUE)
+    assert s.where("user0") == QUEUE
+    s.move("user0", "azul")
+    assert s.team_of("user0") == "azul"
+    s.return_all_to_queue()
+    assert len(s.queue) == 4 and not s.sorted
+    s.resort()
+    assert sizes(s) == [2, 2]
+    s.clear()
+    assert s.queue == [] and sizes(s) == [0, 0]
+
+
+def test_reduce_team_count_redistributes():
+    s = sorter(4, 8)
+    s.sort()
+    s.set_team_count(2)
+    assert list(s.teams) == ["azul", "verde"]
+    assert sizes(s) == [4, 4]
+
+
+def test_voice_same_team_and_other_person():
+    s = sorter(2, 6)
+    s.sort()
+    v = VoiceController(s, random.Random(2))
+    first = v.pick_random("azul")
+    team = v.active_team
+    assert team == "azul"
+    for _ in range(10):
+        prev = v.active
+        nxt = v.pick_random()  # same team, different person
+        assert v.active_team == team and nxt != prev
+    v.stop()
+    v.pick_random()  # remembers last team after stop
+    assert v.active_team == team
+    assert v.give("someone_else") == "someone_else"
+    assert v.active_team is None
+
+
+def test_voice_empty_team_errors():
+    s = sorter(2, 0)
+    with pytest.raises(SorterError):
+        VoiceController(s).pick_random("azul")
+
+
+def test_parse_privmsg():
+    line = "@display-name=Fulano;emotes= :fulano!fulano@fulano.tmi.twitch.tv PRIVMSG #canal :olá mundo :)"
+    tags, prefix, cmd, params = parse_line(line)
+    assert cmd == "PRIVMSG" and params == ["#canal", "olá mundo :)"]
+    assert tags["display-name"] == "Fulano" and prefix.startswith("fulano!")
+
+
+def test_strip_emotes():
+    assert strip_emotes("Kappa oi Kappa", "25:0-4,9-13").strip() == "oi"
+
+
+def test_dummy_tts_produces_wav():
+    wav = asyncio.run(TTS({"engine": "dummy"}).synthesize("olá goblin", "azul"))
+    assert wav[:4] == b"RIFF" and wav_duration(wav) > 0.1
+
+
+def test_app_flow():
+    async def run():
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
+        assert "fila aberta" in await app.command("open")
+        for name in ("ana", "bia", "caio", "duda"):
+            await app.on_chat(ChatMessage(name, name.title(), "!joinsort", {}))
+        assert len(app.sorter.queue) == 4
+        await app.command("sort")
+        assert sizes(app.sorter) == [2, 2]
+        out = await app.command("voice azul")
+        speaker = app.voice.active
+        assert "voz para" in out and app.voice.active_team == "azul"
+        await app.on_chat(ChatMessage(speaker, speaker, "oi chat https://x.com", {}))
+        await app.on_chat(ChatMessage(speaker, speaker, "!comando", {}))
+        other = next(u for u in ("ana", "bia", "caio", "duda") if u != speaker)
+        await app.on_chat(ChatMessage(other, other, "não sou eu", {}))
+        assert app.speech_q.qsize() == 1
+        utt = app.speech_q.get_nowait()
+        assert utt.text == "oi chat" and utt.team == "azul"
+        await app.command(f"remove {speaker}")
+        assert app.voice.active is None
+        assert (await app.command("bogus")).startswith("erro")
+
+    asyncio.run(run())
+
+
+def test_tint_config_and_command():
+    async def run():
+        app = App({"teams": {"tint_strength": 0.3, "tint": {"azul": {"color": "#000001"}, "verde": "#000002"}}},
+                  TTS({"engine": "dummy"}))
+        assert app.tints["azul"] == {"color": "#000001", "strength": 0.3}
+        assert app.tints["verde"]["color"] == "#000002"
+        assert "força 0.70" in await app.command("tint roxo #112233 0.7")
+        assert app.state()["tints"]["roxo"] == {"color": "#112233", "strength": 0.7}
+        await app.command("tint roxo off")
+        assert app.tints["roxo"]["strength"] == 0
+        assert (await app.command("tint roxo vermelho")).startswith("erro")
+        assert (await app.command("tint laranja #112233")).startswith("erro")
+
+    asyncio.run(run())
+
+
+def test_channel_normalization():
+    from goblin_yapper.app import normalize_channel
+
+    for raw in ("negentropybeing", "#NegentropyBeing", "@negentropybeing", "https://www.twitch.tv/negentropybeing",
+                "twitch.tv/negentropybeing/", "https://m.twitch.tv/negentropybeing?ref=x"):
+        assert normalize_channel(raw) == "negentropybeing", raw
+
+    async def run():
+        app = App({}, TTS({"engine": "dummy"}))
+        assert (await app.command("channel https://www.twitch.tv/negentropybeing")) == "chat: #negentropybeing"
+        assert app.settings["twitch"]["channel"] == "negentropybeing"
+        assert (await app.command("channel não-é-canal!")).startswith("erro")
+        assert app.channel == "negentropybeing"  # unchanged after a bad name
+        await app.command("channel off")
+
+    asyncio.run(run())
+
+
+def test_join_while_closed_sends_notice():
+    class FakeWS:
+        def __init__(self):
+            self.sent = []
+
+        async def send_str(self, data):
+            self.sent.append(json.loads(data))
+
+    async def run():
+        app = App({}, TTS({"engine": "dummy"}))
+        ws = FakeWS()
+        app.clients.add(ws)
+        await app.on_chat(ChatMessage("ana", "Ana", "!joinsort", {}))
+        assert app.sorter.queue == []
+        assert ws.sent == [{"type": "notice", "text": "Ana tentou entrar, mas a fila está fechada"}]
+        await app.command("open")
+        await app.on_chat(ChatMessage("ana", "Ana", "!JoinSorting", {}))
+        assert app.sorter.queue == ["ana"]
+
+    asyncio.run(run())
+
+
+def test_long_messages_are_not_cut():
+    async def run():
+        app = App({}, TTS({"engine": "dummy"}))
+        long_text = "goblin " * 100
+        assert await app.say("ana", long_text)
+        assert app.speech_q.get_nowait().text == long_text.strip()
+
+    asyncio.run(run())

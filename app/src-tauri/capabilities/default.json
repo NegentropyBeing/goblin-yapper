@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window. The panel itself is served by the local backend and needs no IPC.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

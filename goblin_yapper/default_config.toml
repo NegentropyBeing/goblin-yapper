@@ -1,0 +1,60 @@
+[twitch]
+channel = ""                                   # seu canal, ex: "meucanal"
+join_commands = ["!joinsort", "!joinsorting"]
+leave_commands = ["!leavesort"]
+
+[teams]
+count = 4                    # 1..4: azul, verde, roxo, amarelo
+auto_assign_late = true      # quem entra depois do sorteio vai direto pro menor time
+queue_open_on_start = false
+tint_strength = 0.55         # força padrão da tinta: 0 = sem tinta, 1 = cor total
+
+# Tinta aplicada sobre assets/goblin.png + goblin.gif para cada time.
+# Também dá pra mudar ao vivo: tint azul #1e40ff 0.7  |  tint azul off
+[teams.tint.azul]
+color = "#3b82f6"
+strength = 0.55
+
+[teams.tint.verde]
+color = "#22c55e"
+strength = 0.55
+
+[teams.tint.roxo]
+color = "#a855f7"
+strength = 0.55
+
+[teams.tint.amarelo]
+color = "#facc15"
+strength = 0.55
+
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[tts]
+engine = "dummy"             # dummy | sapi | omnivoice | custom
+max_queue = 5                # mensagens na fila de fala antes de descartar
+skip_commands = true         # não ler mensagens que começam com "!"
+
+[tts.sapi]
+voice = ""                   # ex: "Microsoft Maria Desktop" (vazio = padrão do Windows)
+rate = 0                     # -10..10
+
+[tts.omnivoice]
+model = "k2-fsa/OmniVoice"
+device = "cuda:0"
+dtype = "float16"
+sample_rate = 24000
+
+[tts.custom]
+path = "scripts"             # pasta adicionada ao sys.path
+callable = "my_tts:synthesize"   # fn(text, voice) -> wav bytes | (samples, sample_rate)
+# load = "my_tts:load"           # opcional, chamado uma vez ao iniciar (carregar modelo na GPU)
+
+# Vozes por time (clonagem). "default" vale para todos; cada time sobrepõe.
+[tts.voices.default]
+pitch = 180                  # usado só pela engine dummy
+
+# [tts.voices.azul]
+# ref_audio = "voices/azul.wav"
+# ref_text = "transcrição do áudio de referência"
