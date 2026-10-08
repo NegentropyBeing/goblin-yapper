@@ -32,7 +32,7 @@ host = "127.0.0.1"
 port = 8765
 
 [tts]
-engine = "dummy"             # dummy | sapi | omnivoice | custom
+engine = "server"            # server (OmniVoice, perfis de voz) | sapi | dummy | custom
 max_queue = 5                # mensagens na fila de fala antes de descartar
 skip_commands = true         # não ler mensagens que começam com "!"
 
@@ -40,21 +40,18 @@ skip_commands = true         # não ler mensagens que começam com "!"
 voice = ""                   # ex: "Microsoft Maria Desktop" (vazio = padrão do Windows)
 rate = 0                     # -10..10
 
-[tts.omnivoice]
-model = "k2-fsa/OmniVoice"
-device = "cuda:0"
-dtype = "float16"
-sample_rate = 24000
+[tts.server]                 # servidor TTS (tts_server/), iniciado pelo app
+url = "http://127.0.0.1:8766"
+autostart = true
+engine = "omnivoice"
+# python = ""                # python do ambiente do servidor (padrão: tts_server/.venv)
 
 [tts.custom]
 path = "scripts"             # pasta adicionada ao sys.path
 callable = "my_tts:synthesize"   # fn(text, voice) -> wav bytes | (samples, sample_rate)
 # load = "my_tts:load"           # opcional, chamado uma vez ao iniciar (carregar modelo na GPU)
 
-# Vozes por time (clonagem). "default" vale para todos; cada time sobrepõe.
+# Perfil de voz de cada time: escolhido na aba "Voz" do painel (fica salvo no settings.json).
+
 [tts.voices.default]
 pitch = 180                  # usado só pela engine dummy
-
-# [tts.voices.azul]
-# ref_audio = "voices/azul.wav"
-# ref_text = "transcrição do áudio de referência"

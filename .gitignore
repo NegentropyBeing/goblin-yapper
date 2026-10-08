@@ -10,3 +10,4 @@ app/node_modules/
 app/src-tauri/target/
 app/src-tauri/binaries/
 app/src-tauri/gen/
+tts_server/.venv/

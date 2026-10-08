@@ -94,6 +94,70 @@
   #offline { position: fixed; inset: 0; background: #12141ae6; display: none; place-items: center; z-index: 20; font-size: 16px; color: var(--muted); }
   #offline.show { display: grid; }
 
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { border: 0; border-radius: 0; background: transparent; padding: 6px 16px; font-weight: 600; }
+  .tabs button.on { background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tab { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  body[data-tab="voz"] #tab-goblin, body:not([data-tab="voz"]) #tab-voz, body[data-tab="voz"] .game-only { display: none; }
+  /* ---- Voz tab ---- */
+  #tab-voz { overflow: auto; }
+  #vzStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  #vzStatus select, .card select, .card textarea, .card input[type=number] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  #vzBanner { margin: 12px 16px 0; padding: 10px 14px; border-radius: var(--radius); border: 1px solid #f59e0b; background: #f59e0b14; white-space: pre-wrap; }
+  #vzGrid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 12px; padding: 12px 16px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .card h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .card textarea { width: 100%; resize: vertical; font: inherit; }
+  .card .row { display: flex; gap: 6px; align-items: center; }
+  .card .row > select, .card .row > input[type=text] { flex: 1; min-width: 0; }
+  .hint { margin: 0; font-size: 12px; color: var(--muted); }
+  .field-label { font-size: 12px; color: var(--muted); }
+  .vz-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 12px; border: 2px dashed var(--line);
+    border-radius: var(--radius); background: var(--bg); cursor: pointer; text-align: center; }
+  .vz-drop span { font-size: 12px; color: var(--muted); }
+  .vz-drop.over { border-color: var(--accent); background: #7fbf3f12; }
+  .vz-drop.disabled { opacity: .5; pointer-events: none; }
+  .vz-opts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+  .vz-opts input[type=number] { width: 56px; padding: 2px 6px; }
+  .vz-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .vz-steps li { display: flex; gap: 8px; color: var(--muted); }
+  .vz-steps li::before { content: "○"; width: 14px; text-align: center; }
+  .vz-steps li.running { color: var(--text); } .vz-steps li.running::before { content: "◌"; animation: spin 1s linear infinite; display: inline-block; }
+  .vz-steps li.done { color: var(--text); } .vz-steps li.done::before { content: "✓"; color: #22c55e; }
+  .vz-steps li.error { color: #fca5a5; } .vz-steps li.error::before { content: "✕"; }
+  .vz-steps li .detail { color: var(--muted); font-size: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #vzDraft { display: flex; flex-direction: column; gap: 8px; }
+  #vzDraft[hidden] { display: none; }
+  audio { width: 100%; height: 34px; }
+  .vz-profiles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .vz-profiles:empty::after { content: attr(data-empty); color: var(--muted); font-size: 12px; }
+  .vz-profile { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .vz-profile .top { display: flex; align-items: center; gap: 6px; }
+  .vz-profile .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vz-profile .meta, .vz-profile .ref { font-size: 12px; color: var(--muted); }
+  .vz-profile .ref { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .vz-profile .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 0 7px; border-radius: 999px; background: var(--bg); color: var(--team, var(--muted)); border: 1px solid var(--team, var(--line)); }
+  .vz-profile .edit { display: flex; flex-direction: column; gap: 6px; }
+  .param { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .param:last-child { border-bottom: 0; }
+  .param .label { font-size: 13px; }
+  .param .label.overridden { color: var(--accent); font-weight: 600; }
+  .param .ctl { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .param .ctl input[type=range] { flex: 1; accent-color: var(--accent); }
+  .param .ctl output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .param .ctl select, .param .ctl input[type=text] { flex: 1; min-width: 0; }
+  .param .help { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+  .param .reset { padding: 0 6px; font-size: 12px; visibility: hidden; }
+  .param .reset.show { visibility: visible; }
+  .param.inherited .ctl { opacity: .6; }
+  #vzAdvanced summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0; }
+  .team-voice { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; padding: 4px 0; }
+  .team-voice b { text-transform: capitalize; color: var(--team, var(--text)); }
+  @media (max-width: 1100px) { #vzGrid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px) { #vzGrid { grid-template-columns: 1fr; } }
+
   @media (max-width: 760px) {
     main { grid-template-columns: 1fr; }
     .drawer-body { grid-template-columns: 1fr; }
@@ -104,19 +168,20 @@
 <body>
 <header>
   <h1>Goblin <span>Yapper</span></h1>
+  <nav class="tabs"><button data-tab-btn="goblin" class="on">Goblin</button><button data-tab-btn="voz">Voz</button></nav>
   <div class="group">
     <span class="pill"><span class="dot" id="chatDot"></span><span id="chatStatus">desligado</span></span>
     <input type="text" id="channel" placeholder="canal da twitch" size="14" spellcheck="false">
     <button id="channelBtn">Conectar</button>
   </div>
-  <div class="sep"></div>
-  <div class="group">
+  <div class="sep game-only"></div>
+  <div class="group game-only">
     <button id="queueBtn">Abrir fila</button>
     <span class="pill">times</span>
     <div class="seg" id="teamCount"></div>
   </div>
-  <div class="sep"></div>
-  <div class="group">
+  <div class="sep game-only"></div>
+  <div class="group game-only">
     <button class="primary" data-cmd="sort" title="Sorteia quem está na fila">Sortear</button>
     <button data-cmd="resort" title="Devolve todos à fila e sorteia de novo">Re-sortear</button>
     <button data-cmd="reset" title="Devolve todos dos times à fila">Devolver à fila</button>
@@ -124,6 +189,7 @@
   </div>
 </header>
 
+<div class="tab" id="tab-goblin">
 <section id="voicebar">
   <div id="speaker"><span class="mic">🎤</span><div><div class="who" id="speakerName">ninguém com a voz</div><div class="team" id="speakerTeam">escolha um time ou uma pessoa</div></div></div>
   <button data-cmd="next" id="nextBtn" title="Outra pessoa do mesmo time">Próximo do time</button>
@@ -152,6 +218,89 @@
     </div>
   </div>
 </details>
+</div>
+
+<div class="tab" id="tab-voz">
+  <section id="vzStatus">
+    <span class="dot" id="vzDot"></span>
+    <span id="vzStatusText">verificando servidor de voz…</span>
+    <span class="spacer"></span>
+    <label class="pill">motor
+      <select id="vzEngine">
+        <option value="server">OmniVoice (servidor)</option>
+        <option value="sapi">Windows (SAPI)</option>
+        <option value="dummy">teste (bipes)</option>
+      </select>
+    </label>
+    <button id="vzRestart">Reiniciar servidor</button>
+  </section>
+  <div id="vzBanner" hidden></div>
+
+  <div id="vzGrid">
+    <!-- profiles -->
+    <section class="card">
+      <h2>Novo perfil de voz</h2>
+      <label class="vz-drop" id="vzDrop">
+        <input type="file" id="vzFile" accept="audio/*,.wav" hidden>
+        <strong>Arraste um .wav aqui</strong>
+        <span>ou clique para escolher · 3–20s de fala limpa funciona melhor</span>
+      </label>
+      <div class="vz-opts">
+        <label><input type="checkbox" id="vzTrim" checked> cortar silêncio</label>
+        <label><input type="checkbox" id="vzNorm" checked> normalizar volume</label>
+        <label><input type="checkbox" id="vzAuto" checked> transcrever com Whisper</label>
+        <label>máx. <input type="number" id="vzMax" value="20" min="3" max="60" step="1"> s</label>
+      </div>
+      <ol class="vz-steps" id="vzSteps">
+        <li data-step="prepare">Preparar áudio</li>
+        <li data-step="transcribe">Transcrever</li>
+        <li data-step="review">Revisar transcrição</li>
+        <li data-step="create">Criar perfil</li>
+      </ol>
+      <div id="vzDraft" hidden>
+        <audio id="vzDraftAudio" controls></audio>
+        <label class="field-label">Transcrição (o que é falado no áudio)</label>
+        <textarea id="vzRefText" rows="3" placeholder="digite exatamente o que é dito no áudio…"></textarea>
+        <div class="row">
+          <input type="text" id="vzName" placeholder="nome do perfil">
+          <button class="primary" id="vzCreate">Criar perfil</button>
+          <button id="vzCancel">Cancelar</button>
+        </div>
+      </div>
+
+      <h2 style="margin-top:18px">Perfis</h2>
+      <ul class="vz-profiles" id="vzProfiles" data-empty="nenhum perfil ainda — crie um acima"></ul>
+    </section>
+
+    <!-- parameters -->
+    <section class="card">
+      <h2>Parâmetros</h2>
+      <div class="row">
+        <select id="vzScope"></select>
+        <button class="primary" id="vzSave" disabled>Salvar</button>
+      </div>
+      <p class="hint" id="vzScopeHint"></p>
+      <div id="vzParams"></div>
+      <details id="vzAdvanced"><summary>Avançados</summary><div id="vzParamsAdv"></div></details>
+    </section>
+
+    <!-- test + team voices -->
+    <section class="card">
+      <h2>Testar fala</h2>
+      <textarea id="vzTestText" rows="3">Fala chat! Eu sou o goblin e hoje eu vou ler as mensagens de vocês.</textarea>
+      <div class="row">
+        <select id="vzTestProfile"></select>
+        <button class="primary" id="vzSpeak">Falar</button>
+      </div>
+      <p class="hint">Usa os parâmetros do formulário, mesmo antes de salvar.</p>
+      <audio id="vzTestAudio" controls hidden></audio>
+      <p class="hint" id="vzTestInfo"></p>
+
+      <h2 style="margin-top:18px">Voz de cada time</h2>
+      <div id="vzTeams"></div>
+    </section>
+  </div>
+</div>
 
 <div id="toast"></div>
 <div id="offline">conectando ao servidor…</div>
@@ -223,6 +372,7 @@ function render() {
   renderUrls(teams);
   $("#dataInfo").textContent = `${state.data_dir || "-"}  ·  TTS: ${state.tts_engine}` +
     (state.tts_error ? `  (falha ao carregar: ${state.tts_error})` : "");
+  vzOnState();
 }
 
 function renderBoard(teams) {
@@ -392,6 +542,375 @@ $("#offline").classList.add("show");
 fetch("/api/state").then(r => r.json()).then(s => { state = s; render(); }).catch(() => {});
 loadAssets();
 connect();
+
+// ---- Voz tab ---------------------------------------------------------
+// Talks to the TTS server through the backend's /api/tts/* proxy.
+const vz = { schema: null, settings: { params: {} }, profiles: [], status: null, draft: null,
+             scope: "global", form: {}, dirty: false, timer: null, loaded: false, teamsKey: "" };
+const profileAudio = new Audio();
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
+  return (r.headers.get("content-type") || "").includes("json") ? r.json() : r;
+}
+const jsonOpts = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+function setTab(tab) {
+  document.body.dataset.tab = tab;
+  document.querySelectorAll("[data-tab-btn]").forEach(b => b.classList.toggle("on", b.dataset.tabBtn === tab));
+  try { localStorage.setItem("gy-tab", tab); } catch {}
+  clearInterval(vz.timer);
+  if (tab === "voz") { vzPoll(); vz.timer = setInterval(vzPoll, 2000); }
+}
+
+async function vzPoll() {
+  try { vz.status = await api("/api/tts-service"); } catch { vz.status = { mode: "offline" }; }
+  renderVzStatus();
+  if (vz.status.server?.state !== "ready") { vz.loaded = false; return; }
+  if (!vz.loaded) { vz.loaded = true; await vzLoadAll(); }
+}
+
+function renderVzStatus() {
+  const st = vz.status, sv = st.server || {};
+  let dot = "", text, banner = "";
+  if (st.mode === "not_installed") {
+    dot = "bad"; text = "servidor de voz não instalado";
+    banner = "O ambiente do servidor de voz (PyTorch + OmniVoice) não foi encontrado.\nInstale com  tts_server\\setup.ps1  e depois clique em Reiniciar servidor.";
+  } else if (st.mode === "exited") { dot = "bad"; text = "o servidor de voz parou"; banner = `Veja o log: ${st.log}`; }
+  else if (st.mode === "offline") { dot = "bad"; text = "sem conexão com o app"; }
+  else if (st.mode === "stopped" || st.mode === "disabled") { text = "servidor de voz parado"; }
+  else if (sv.state === "ready") {
+    dot = "ok";
+    text = [sv.label, "pronto", sv.gpu, sv.vram_used_gb != null ? `VRAM ${sv.vram_used_gb}/${sv.vram_total_gb} GB` : "",
+            sv.asr_loaded ? "Whisper carregado" : "", sv.busy ? `${sv.busy}…` : "",
+            st.mode === "external" ? "iniciado fora do app" : ""].filter(Boolean).join(" · ");
+  } else if (sv.state === "error") { dot = "bad"; text = "erro ao carregar o modelo"; banner = `${sv.error}\nLog: ${st.log}`; }
+  else { dot = "warn"; text = "carregando modelo de voz…"; }
+  $("#vzDot").className = "dot " + dot;
+  $("#vzStatusText").textContent = text;
+  $("#vzBanner").hidden = !banner;
+  $("#vzBanner").textContent = banner;
+  $("#vzRestart").disabled = st.mode === "external";
+  $("#vzDrop").classList.toggle("disabled", sv.state !== "ready");
+  $("#vzSpeak").disabled = sv.state !== "ready";
+}
+
+async function vzLoadAll() {
+  try {
+    [vz.schema, vz.settings, vz.profiles] = await Promise.all(
+      [api("/api/tts/schema"), api("/api/tts/settings"), api("/api/tts/profiles")]);
+  } catch (e) { toast(e.message, true); vz.loaded = false; return; }
+  vzResetForm(); renderScope(); renderParams(); renderProfiles(); renderTestProfiles(); vz.teamsKey = ""; renderTeamVoices();
+}
+
+async function vzReloadProfiles() {
+  vz.profiles = await api("/api/tts/profiles");
+  renderScope(); renderProfiles(); renderTestProfiles(); vz.teamsKey = ""; renderTeamVoices();
+}
+
+// called from render() on every state update
+function vzOnState() {
+  if (document.activeElement !== $("#vzEngine")) $("#vzEngine").value = state.tts_engine;
+  if (vz.loaded) { renderTeamVoices(); renderProfiles(); }
+}
+
+// -- parameters
+
+function vzResetForm() {
+  const src = vz.scope === "global" ? vz.settings.params : vz.profiles.find(p => p.id === vz.scope)?.params;
+  vz.form = { ...(src || {}) };
+  vz.dirty = false;
+  $("#vzSave").disabled = true;
+}
+
+function renderScope() {
+  if (vz.scope !== "global" && !vz.profiles.some(p => p.id === vz.scope)) { vz.scope = "global"; vzResetForm(); }
+  $("#vzScope").innerHTML = `<option value="global">Padrão global (todos os perfis)</option>` +
+    vz.profiles.map(p => `<option value="${esc(p.id)}">Só o perfil: ${esc(p.name)}</option>`).join("");
+  $("#vzScope").value = vz.scope;
+  $("#vzScopeHint").textContent = vz.scope === "global"
+    ? "Vale para todos os perfis. ↺ volta ao padrão do modelo."
+    : "Vale só para este perfil. Campos esmaecidos herdam o valor global; ↺ volta a herdar.";
+}
+
+function inherited(p) {
+  return vz.scope === "global" ? p.default : (vz.settings.params[p.key] ?? p.default);
+}
+
+function fmt(p, v) {
+  if (p.type === "int") return String(v);
+  return Number(v).toFixed(p.step < 0.1 ? 2 : p.step < 1 ? 1 : 0);
+}
+
+function paramHtml(p) {
+  const over = p.key in vz.form, val = over ? vz.form[p.key] : inherited(p);
+  let ctl;
+  if (p.type === "bool") ctl = `<input type="checkbox" data-param="${p.key}" ${val ? "checked" : ""}> <span class="hint">${val ? "ligado" : "desligado"}</span>`;
+  else if (p.type === "select") ctl = `<select data-param="${p.key}">${p.options.map(o =>
+    `<option value="${esc(o.value)}" ${o.value === val ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+  else if (p.type === "text") ctl = `<input type="text" data-param="${p.key}" value="${esc(val ?? "")}">`;
+  else ctl = `<input type="range" data-param="${p.key}" min="${p.min}" max="${p.max}" step="${p.step ?? (p.type === "int" ? 1 : 0.01)}" value="${val}"><output>${fmt(p, val)}</output>`;
+  return `<div class="param ${over || vz.scope === "global" ? "" : "inherited"}">
+    <span class="label ${over ? "overridden" : ""}">${esc(p.label)}</span>
+    <button class="icon reset ${over ? "show" : ""}" data-reset="${p.key}" title="${vz.scope === "global" ? "voltar ao padrão do modelo" : "voltar a herdar o valor global"}">↺</button>
+    <div class="ctl">${ctl}</div>${p.help ? `<div class="help">${esc(p.help)}</div>` : ""}</div>`;
+}
+
+function renderParams() {
+  if (!vz.schema) return;
+  const ps = vz.schema.params;
+  $("#vzParams").innerHTML = ps.filter(p => p.group !== "advanced").map(paramHtml).join("");
+  $("#vzParamsAdv").innerHTML = ps.filter(p => p.group === "advanced").map(paramHtml).join("");
+}
+
+function readParam(p, el) {
+  if (p.type === "bool") return el.checked;
+  if (p.type === "int") return parseInt(el.value, 10);
+  if (p.type === "float") return parseFloat(el.value);
+  return el.value;
+}
+
+function vzParamInput(e) {
+  const el = e.target.closest("[data-param]");
+  if (!el) return;
+  const p = vz.schema.params.find(x => x.key === el.dataset.param);
+  const v = readParam(p, el);
+  vz.form[p.key] = v;
+  vz.dirty = true;
+  $("#vzSave").disabled = false;
+  const row = el.closest(".param");
+  row.classList.remove("inherited");
+  $(".label", row).classList.add("overridden");
+  $(".reset", row).classList.add("show");
+  const out = $("output", row);
+  if (out) out.textContent = fmt(p, v);
+  if (p.type === "bool") $(".ctl .hint", row).textContent = v ? "ligado" : "desligado";
+}
+
+async function vzSave() {
+  try {
+    if (vz.scope === "global") vz.settings = await api("/api/tts/settings", jsonOpts("PUT", { params: vz.form }));
+    else { await api(`/api/tts/profiles/${vz.scope}`, jsonOpts("PATCH", { params: vz.form })); await vzReloadProfiles(); }
+    vzResetForm(); renderParams(); toast("parâmetros salvos");
+  } catch (e) { toast(e.message, true); }
+}
+
+function vzSetScope(scope) {
+  if (scope === vz.scope) return;
+  if (vz.dirty && !confirm("Descartar as mudanças não salvas nos parâmetros?")) { $("#vzScope").value = vz.scope; return; }
+  vz.scope = scope;
+  vzResetForm(); renderScope(); renderParams();
+}
+
+// -- profile pipeline: prepare -> transcribe -> review -> create
+
+function setStep(step, cls, detail = "") {
+  const li = $(`#vzSteps [data-step="${step}"]`);
+  li.className = cls;
+  li.querySelector(".detail")?.remove();
+  if (detail) li.insertAdjacentHTML("beforeend", ` <span class="detail">${esc(detail)}</span>`);
+}
+
+function resetPipeline() {
+  vz.draft = null;
+  ["prepare", "transcribe", "review", "create"].forEach(s => setStep(s, ""));
+  $("#vzDraft").hidden = true;
+  $("#vzRefText").value = ""; $("#vzName").value = ""; $("#vzFile").value = "";
+}
+
+async function vzHandleFile(file) {
+  if (vz.status?.server?.state !== "ready") return toast("o servidor de voz ainda não está pronto", true);
+  resetPipeline();
+  setStep("prepare", "running", file.name);
+  const q = new URLSearchParams({ trim: $("#vzTrim").checked ? 1 : 0, normalize: $("#vzNorm").checked ? 1 : 0,
+                                  max_seconds: $("#vzMax").value || 20 });
+  let d;
+  try { d = await api(`/api/tts/pipeline/prepare?${q}`, { method: "POST", body: file }); }
+  catch (e) { setStep("prepare", "error", e.message); return; }
+  vz.draft = d;
+  setStep("prepare", "done", `${d.steps.map(s => s.detail).join(" · ")} → ${d.duration}s`);
+  $("#vzDraft").hidden = false;
+  $("#vzDraftAudio").src = `/api/tts${d.url}`;
+  $("#vzName").value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+  if ($("#vzAuto").checked) {
+    setStep("transcribe", "running", "Whisper (a primeira vez demora ~20s)");
+    try {
+      const t = await api(`/api/tts/pipeline/${d.draft_id}/transcribe`, { method: "POST" });
+      if (vz.draft !== d) return;
+      $("#vzRefText").value = t.text;
+      setStep("transcribe", "done", `${t.seconds}s`);
+    } catch (e) { setStep("transcribe", "error", e.message); }
+  } else setStep("transcribe", "done", "pulado — digite abaixo");
+  setStep("review", "running", "confira o texto e o nome");
+  $("#vzRefText").focus();
+}
+
+async function vzCreate() {
+  const d = vz.draft;
+  if (!d) return;
+  const name = $("#vzName").value.trim(), ref_text = $("#vzRefText").value.trim();
+  if (!ref_text) return toast("a transcrição é obrigatória", true);
+  if (!name) return toast("dê um nome ao perfil", true);
+  setStep("review", "done"); setStep("create", "running");
+  $("#vzCreate").disabled = true;
+  try {
+    const p = await api("/api/tts/profiles", jsonOpts("POST", { draft_id: d.draft_id, name, ref_text }));
+    setStep("create", "done", p.name);
+    toast(`perfil "${p.name}" criado`);
+    vz.draft = null; $("#vzDraft").hidden = true;
+    await vzReloadProfiles();
+    $("#vzTestProfile").value = p.id;
+  } catch (e) { setStep("create", "error", e.message); }
+  finally { $("#vzCreate").disabled = false; }
+}
+
+// -- profiles list
+
+let profilesKey = "", editing = null;
+function renderProfiles() {
+  const used = {};
+  for (const [t, id] of Object.entries(state?.team_profiles || {})) (used[id] ||= []).push(t);
+  const key = JSON.stringify([vz.profiles, used, editing]);
+  if (key === profilesKey) return;
+  profilesKey = key;
+  $("#vzProfiles").innerHTML = vz.profiles.map(p => {
+    const own = Object.keys(p.params || {}).length;
+    return `<li class="vz-profile" data-profile="${esc(p.id)}">
+      <div class="top"><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
+        <button class="icon" data-vz="play" title="Ouvir a referência">▶</button>
+        <button class="icon" data-vz="params" title="Parâmetros deste perfil">⚙</button>
+        <button class="icon" data-vz="edit" title="Editar nome e transcrição">✎</button>
+        <button class="icon danger" data-vz="delete" title="Apagar">✕</button></div>
+      <div class="meta">${p.duration}s de referência${own ? ` · ${own} parâmetro(s) próprio(s)` : ""}${p.ready ? "" : " · ⚠ voz não gerada"}</div>
+      ${editing === p.id ? `<div class="edit">
+          <input type="text" class="e-name" value="${esc(p.name)}">
+          <textarea class="e-text" rows="3">${esc(p.ref_text)}</textarea>
+          <p class="hint">Mudar a transcrição recria a voz do perfil.</p>
+          <div class="row"><button class="primary" data-vz="save-edit">Salvar</button><button data-vz="cancel-edit">Cancelar</button></div>
+        </div>` : `<div class="ref">“${esc(p.ref_text)}”</div>`}
+      ${used[p.id] ? `<div class="tags">${used[p.id].map(t =>
+        `<span class="tag" style="--team:${t === "default" ? "var(--muted)" : teamColor(t)}">${t === "default" ? "padrão" : esc(t)}</span>`).join("")}</div>` : ""}
+    </li>`;
+  }).join("");
+}
+
+async function vzProfileAction(action, id, li) {
+  if (action === "play") { profileAudio.src = `/api/tts/profiles/${id}/reference.wav`; profileAudio.play().catch(() => {}); }
+  else if (action === "params") { vzSetScope(id); $("#vzScope").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  else if (action === "edit") { editing = id; renderProfiles(); }
+  else if (action === "cancel-edit") { editing = null; renderProfiles(); }
+  else if (action === "save-edit") {
+    const btn = $("[data-vz=save-edit]", li);
+    btn.disabled = true; btn.textContent = "salvando…";
+    try {
+      await api(`/api/tts/profiles/${id}`, jsonOpts("PATCH", { name: $(".e-name", li).value, ref_text: $(".e-text", li).value }));
+      editing = null; await vzReloadProfiles(); toast("perfil atualizado");
+    } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = "Salvar"; }
+  } else if (action === "delete") {
+    const p = vz.profiles.find(x => x.id === id);
+    if (!confirm(`Apagar o perfil "${p?.name}"?`)) return;
+    try {
+      await api(`/api/tts/profiles/${id}`, { method: "DELETE" });
+      for (const [t, pid] of Object.entries(state.team_profiles || {})) if (pid === id) await cmd(`teamvoice ${t} none`, { quiet: true });
+      await vzReloadProfiles(); toast("perfil apagado");
+    } catch (e) { toast(e.message, true); }
+  }
+}
+
+// -- test speech
+
+function renderTestProfiles() {
+  const sel = $("#vzTestProfile"), cur = sel.value;
+  sel.innerHTML = `<option value="">sem perfil (voz automática)</option>` +
+    vz.profiles.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
+  sel.value = vz.profiles.some(p => p.id === cur) ? cur : (vz.profiles[0]?.id || "");
+}
+
+async function vzSpeak() {
+  const text = $("#vzTestText").value.trim();
+  if (!text) return;
+  const profile = $("#vzTestProfile").value || null;
+  const body = { text, profile };
+  if (vz.scope === "global") body.global_params = vz.form;  // preview unsaved global edits
+  else if (vz.scope === profile) body.params = vz.form;    // preview unsaved edits of this profile
+  const btn = $("#vzSpeak");
+  btn.disabled = true; $("#vzTestInfo").textContent = "gerando…";
+  try {
+    const r = await api("/api/tts/synthesize", jsonOpts("POST", body));
+    const audio = $("#vzTestAudio");
+    audio.src = URL.createObjectURL(await r.blob());
+    audio.hidden = false; audio.play().catch(() => {});  // the player stays visible if autoplay is blocked
+    $("#vzTestInfo").textContent = `${r.headers.get("x-audio-seconds")}s de áudio gerados em ${r.headers.get("x-gen-seconds")}s`;
+  } catch (e) { toast(e.message, true); $("#vzTestInfo").textContent = ""; }
+  finally { btn.disabled = false; }
+}
+
+// -- team voices
+
+function renderTeamVoices() {
+  if (!state) return;
+  const teams = [...Object.keys(state.teams), "default"];
+  const key = JSON.stringify([teams, state.team_profiles, vz.profiles.map(p => [p.id, p.name])]);
+  if (key === vz.teamsKey) return;
+  vz.teamsKey = key;
+  $("#vzTeams").innerHTML = teams.map(t => {
+    const none = t === "default" ? "— nenhum (voz automática) —" : "— usar o padrão —";
+    const cur = state.team_profiles?.[t];
+    return `<div class="team-voice" style="--team:${t === "default" ? "var(--text)" : teamColor(t)}">
+      <b>${t === "default" ? "padrão" : esc(t)}</b>
+      <select data-team-voice="${t}"><option value="none">${none}</option>${vz.profiles.map(p =>
+        `<option value="${esc(p.id)}" ${p.id === cur ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>`;
+  }).join("") + `<p class="hint">Quem tem a voz fala com o perfil do seu time. Times sem perfil usam o padrão.</p>`;
+}
+
+// -- wiring
+
+document.querySelectorAll("[data-tab-btn]").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tabBtn)));
+$("#vzParams").addEventListener("input", vzParamInput);
+$("#vzParamsAdv").addEventListener("input", vzParamInput);
+for (const box of ["#vzParams", "#vzParamsAdv"]) $(box).addEventListener("click", (e) => {
+  const b = e.target.closest("[data-reset]");
+  if (!b) return;
+  delete vz.form[b.dataset.reset];
+  vz.dirty = true; $("#vzSave").disabled = false;
+  renderParams();
+});
+$("#vzScope").addEventListener("change", (e) => vzSetScope(e.target.value));
+$("#vzSave").addEventListener("click", vzSave);
+$("#vzSpeak").addEventListener("click", vzSpeak);
+$("#vzCreate").addEventListener("click", vzCreate);
+$("#vzCancel").addEventListener("click", resetPipeline);
+$("#vzRestart").addEventListener("click", async () => {
+  if (!confirm("Reiniciar o servidor de voz? O modelo será recarregado.")) return;
+  try { vz.status = await api("/api/tts-service/restart", { method: "POST" }); vz.loaded = false; renderVzStatus(); toast("servidor de voz reiniciando"); }
+  catch (e) { toast(e.message, true); }
+});
+$("#vzEngine").addEventListener("change", (e) => cmd(`engine ${e.target.value}`));
+$("#vzTeams").addEventListener("change", (e) => {
+  const sel = e.target.closest("[data-team-voice]");
+  if (sel) cmd(`teamvoice ${sel.dataset.teamVoice} ${sel.value}`, { quiet: true });
+});
+$("#vzProfiles").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-vz]"), li = e.target.closest("[data-profile]");
+  if (b && li) vzProfileAction(b.dataset.vz, li.dataset.profile, li);
+});
+const vzDrop = $("#vzDrop");
+vzDrop.addEventListener("dragover", (e) => { e.preventDefault(); vzDrop.classList.add("over"); });
+vzDrop.addEventListener("dragleave", () => vzDrop.classList.remove("over"));
+vzDrop.addEventListener("drop", (e) => {
+  e.preventDefault(); e.stopPropagation(); vzDrop.classList.remove("over");
+  if (e.dataTransfer.files[0]) vzHandleFile(e.dataTransfer.files[0]);
+});
+$("#vzFile").addEventListener("change", (e) => { if (e.target.files[0]) vzHandleFile(e.target.files[0]); });
+// A file dropped outside a drop zone would otherwise replace the page.
+window.addEventListener("dragover", (e) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
+window.addEventListener("drop", (e) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
+
+// /panel#voz or #goblin opens that tab; otherwise the last one used
+let initialTab = location.hash.slice(1);
+if (!initialTab) try { initialTab = localStorage.getItem("gy-tab") || "goblin"; } catch {}
+setTab(initialTab === "voz" ? "voz" : "goblin");
 </script>
 </body>
 </html>

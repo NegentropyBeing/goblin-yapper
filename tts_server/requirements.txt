@@ -1,0 +1,5 @@
+# Installed by setup.ps1 after PyTorch (CUDA 12.8 build, needed for RTX 50xx).
+# Versions verified on an RTX 5070.
+omnivoice==0.2.1
+aiohttp>=3.9
+soundfile>=0.12

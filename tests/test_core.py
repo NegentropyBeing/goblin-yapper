@@ -209,3 +209,28 @@ def test_long_messages_are_not_cut():
         assert app.speech_q.get_nowait().text == long_text.strip()
 
     asyncio.run(run())
+
+
+def test_teamvoice_and_engine_commands(tmp_path):
+    async def run():
+        settings = tmp_path / "settings.json"
+        app = App({}, TTS({"engine": "dummy"}), settings_path=settings)
+        assert (await app.command("teamvoice azul goblin-azul-1")) == "voz de azul: goblin-azul-1"
+        await app.command("teamvoice default narrador-2")
+        assert app.tts.voice_for("azul")["profile"] == "goblin-azul-1"
+        assert app.tts.voice_for("verde")["profile"] == "narrador-2"  # falls back to default
+        await app.command("teamvoice azul none")
+        assert "azul" not in app.tts.team_profiles
+        assert json.loads(settings.read_text(encoding="utf-8"))["tts"]["team_profiles"] == {"default": "narrador-2"}
+        assert (await app.command("teamvoice laranja x")).startswith("erro")
+
+        assert (await app.command("engine sapi")) == "TTS: sapi"
+        assert app.tts.engine.name == "sapi"
+        assert (await app.command("engine nope")).startswith("erro")
+        assert app.tts.engine.name == "sapi"  # unchanged after a bad name
+
+        # saved team voices come back on restart
+        again = App({}, TTS({"engine": "dummy"}), settings_path=settings)
+        assert again.tts.team_profiles == {"default": "narrador-2"}
+
+    asyncio.run(run())

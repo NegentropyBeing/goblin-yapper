@@ -23,9 +23,10 @@ All commands are PowerShell, run from the project folder
 py -3.13 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 cd app; npm install; cd ..
+.\tts_server\setup.ps1          # voice server: PyTorch CUDA + OmniVoice (several GB)
 ```
 
-**Start the backend from source** (latest Python code; required for GPU TTS)
+**Start the backend from source** (latest Python code; also starts the TTS server)
 
 ```powershell
 .venv\Scripts\python -m goblin_yapper --data-dir "$env:APPDATA\com.goblinyapper.desktop"
@@ -87,9 +88,9 @@ Installed app:
   goblin image upload, OBS overlay URLs to copy.
 - user data lives in `%APPDATA%\com.goblinyapper.desktop\` — `config.toml`, `settings.json` (panel changes),
   `assets\`, `voices\`, `scripts\`, `goblin-yapper.log`.
-- the bundled backend has no PyTorch, so `omnivoice`/GPU `custom` engines fall back to the Windows voice.
-  For GPU TTS, start the backend from source (see Setup and run) **before** opening the app: it detects the server on
-  port 8765 and attaches to it instead of starting its own.
+- the bundled backend doesn't start the TTS server yet (it looks for `tts_server\.venv` next to the source).
+  For the OmniVoice voice, start the backend from source (see Setup and run) **before** opening the app: it
+  detects the server on port 8765 and attaches to it instead of starting its own.
 
 ## Twitch chat commands
 
@@ -132,6 +133,8 @@ a terminal) and the HTTP API all use these same commands. `<time>` is `azul`, `v
 | `stop` | Take the voice away and cut the audio |
 | `channel <canal\|off>` | Connect to a channel's chat (name or pasted link), or disconnect |
 | `tint <time> <#rrggbb\|off> [0-1]` | Team goblin tint color and strength |
+| `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |
+| `engine <server\|sapi\|dummy>` | Switch the TTS engine |
 | `test <time> <texto>` | Make that team's goblin say a test line |
 | `state` | Print queue, teams and who has the voice |
 
@@ -158,15 +161,61 @@ or live with `tint azul #1e40ff 0.7` / `tint azul off`. A neutral/grayish goblin
 Per-team images (`azul.png` / `azul.gif`) override the shared ones if present.
 Without images the built-in goburin goblin (drawn as SVG, tinted per team) is used.
 
-## TTS
+## Voice (TTS server + "Voz" tab)
 
-`[tts] engine` in `config.toml`:
+The voice runs in a separate **TTS server** (`tts_server/`): its own Python environment with PyTorch
+(CUDA) and OmniVoice, which loads the model on the GPU once. The backend starts it automatically and
+stops it on exit (`[tts.server] autostart`). If one is already running at `[tts.server] url`, it is used
+instead.
 
-| engine      | needs                                  |
-|-------------|----------------------------------------|
-| `dummy`     | nothing (babble tones, for testing)    |
-| `sapi`      | Windows (`voice = "Microsoft Maria Desktop"` for pt-BR) |
-| `omnivoice` | `torch` (CUDA build) + `omnivoice` package |
-| `custom`    | your script, see `scripts/my_tts.py`   |
+```
+backend (goblin_yapper) ──HTTP──► TTS server (tts_server/server.py) ──► engine (engines/omnivoice_engine.py)
+     /api/tts/* proxy                profiles, pipeline, params              OmniVoice on the GPU
+```
 
-Per-team cloned voices: `[tts.voices.<team>]` with `ref_audio` / `ref_text`; passed to the engine as `voice`.
+The **Voz** tab in the panel (`/panel#voz`):
+
+- **status**: model loading / ready, GPU and VRAM, restart button, engine switch (OmniVoice / Windows / test)
+- **new profile**: drag a `.wav` → prepare (mono, 24 kHz, trim silence, normalize, max length) →
+  transcribe with Whisper → review/edit the transcript → create. The voice clone is computed once and saved.
+- **profiles**: play the reference, edit name/transcript (re-creates the voice), per-profile parameters, delete
+- **parameters**: every OmniVoice parameter (language, speed, decoding steps, guidance, denoise, ...),
+  as global defaults or overrides for one profile
+- **test**: type a line, pick a profile, hear it (uses the form's unsaved values)
+- **team voices**: which profile each team speaks with; teams without one use the default
+
+Profiles live in the data folder: `tts\profiles\<id>\` (`reference.wav`, `profile.json`, `omnivoice.pt`).
+The `.wav` and transcript are the source, so another engine can rebuild its own cache from them.
+Server log: `tts\tts-server.log`.
+
+**Changing the TTS engine later**: add `tts_server/engines/<name>_engine.py` with an `Engine` subclass
+(`params()`, `transcribe()`, `build_profile()`, `synthesize()`; see `engines/base.py`), register it in
+`engines/__init__.py`, and set `[tts.server] engine = "<name>"`. The Voz tab builds its form from the
+engine's `params()`, so nothing in the app needs to change.
+
+Other engines (`[tts] engine` in `config.toml`, or the switch in the Voz tab):
+
+| engine   | what it is                                                     |
+|----------|----------------------------------------------------------------|
+| `server` | the TTS server above (default)                                 |
+| `sapi`   | Windows voices (`[tts.sapi] voice = "Microsoft Maria Desktop"` for pt-BR) |
+| `dummy`  | babble tones, for testing without a GPU                         |
+| `custom` | your own Python function, see `scripts/my_tts.py`               |
+
+## License
+
+Goblin Yapper's own code is **MIT** (see [LICENSE](LICENSE)). It does not include third-party model
+weights or library code; those are installed by `tts_server/setup.ps1` or downloaded on first use, and
+keep their own licenses. See [NOTICE](NOTICE) for the full attributions.
+
+- **OmniVoice** (k2-fsa): code Apache-2.0; the **pre-trained model is CC-BY-NC — non-commercial use only**.
+  Using the OmniVoice voice on monetized streams may count as commercial use; check the model's terms.
+  The engine is swappable (see "Changing the TTS engine later") if you need a commercially licensed model.
+- The OmniVoice model's audio tokenizer: **Built with Higgs Materials licensed from Boson AI USA, Inc.,
+  Copyright Boson AI USA, Inc., All Rights Reserved and Meta Llama 3 licensed under the Meta Llama 3
+  Community License, Copyright Meta Platforms, Inc., All Rights Reserved.** Agreements in
+  [third_party/](third_party/); use must follow the
+  [Meta Llama 3 Acceptable Use Policy](https://llama.meta.com/llama3/use-policy).
+- **Whisper** (OpenAI, transcription): MIT.
+
+Only clone voices with the speaker's permission.

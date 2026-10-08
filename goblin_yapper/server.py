@@ -9,14 +9,19 @@
   PUT    /api/assets/<file>    upload goblin.png / goblin.gif / <team>.png / <team>.gif (raw body)
   DELETE /api/assets/<file>
   WS     /ws                   pushes state/speak/idle/stop/assets; accepts {"type": "ended", "id": n}
+  GET    /api/tts-service      TTS server process status (+ the server's own /status)
+  POST   /api/tts-service/restart
+  *      /api/tts/<path>       forwarded to the TTS server (profiles, pipeline, schema, settings, synthesize)
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
 
+import aiohttp
 from aiohttp import WSMsgType, web
 
 from .app import App
@@ -116,7 +121,34 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
             app.clients.discard(ws)
         return ws
 
-    wa = web.Application(client_max_size=MAX_ASSET_BYTES + 1024)
+    async def tts_service_status(_):
+        if app.tts_service is None:
+            return web.json_response({"mode": "disabled"})
+        return web.json_response(await app.tts_service.status())
+
+    async def tts_service_restart(_):
+        try:
+            await app.tts_service.restart()
+        except RuntimeError as e:
+            raise web.HTTPConflict(text=str(e))
+        return web.json_response(await app.tts_service.status())
+
+    async def tts_proxy(request):
+        svc = app.tts_service
+        if svc is None or svc.session is None:
+            raise web.HTTPServiceUnavailable(text="servidor TTS desativado")
+        url = f"{svc.url}/{request.match_info['tail']}"
+        headers = {k: v for k, v in request.headers.items() if k.lower() == "content-type"}
+        try:
+            async with svc.session.request(request.method, url, params=request.query, data=await request.read(),
+                                           headers=headers, timeout=aiohttp.ClientTimeout(total=300)) as r:
+                body = await r.read()
+                out = {k: v for k, v in r.headers.items() if k.lower() == "content-type" or k.lower().startswith("x-")}
+                return web.Response(body=body, status=r.status, headers=out)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            raise web.HTTPServiceUnavailable(text=f"servidor TTS fora do ar ({type(e).__name__})")
+
+    wa = web.Application(client_max_size=60 * 1024 * 1024)
     wa.add_routes([
         web.get("/", root),
         web.get("/overlay", page("overlay.html")),
@@ -128,6 +160,9 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         web.delete("/api/assets/{name}", delete_asset),
         web.post("/api/command", command),
         web.get("/ws", ws_handler),
+        web.get("/api/tts-service", tts_service_status),
+        web.post("/api/tts-service/restart", tts_service_restart),
+        web.route("*", "/api/tts/{tail:.*}", tts_proxy),
         web.static("/assets", assets_dir),
         web.static("/web", WEB_DIR),
     ])

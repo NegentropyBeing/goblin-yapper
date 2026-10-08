@@ -6,7 +6,7 @@
 Engines:
   dummy     - goblin babble tones, no dependencies (for testing the pipeline/overlay)
   sapi      - Windows built-in voices via PowerShell System.Speech (no GPU)
-  omnivoice - k2-fsa OmniVoice on the GPU (pip install omnivoice + torch with CUDA)
+  server    - the TTS server (tts_server/, OmniVoice on the GPU, voice profiles)
   custom    - your own function "module:func"(text, voice) -> wav bytes | (samples, sample_rate)
 """
 
@@ -113,32 +113,27 @@ class SapiEngine(Engine):
             os.unlink(out)
 
 
-class OmniVoiceEngine(Engine):
-    """k2-fsa OmniVoice. Voice cloning: set ref_audio (+ ref_text) per team in config.
+class ServerEngine(Engine):
+    """The TTS server (tts_server/, OmniVoice on the GPU). `voice["profile"]` picks the voice profile;
+    parameters come from the server's own settings and the profile."""
 
-    NOTE: written against the OmniVoice README API
-    (OmniVoice.from_pretrained(...).generate(text=, ref_audio=, ref_text=)); if your
-    installed version differs, adjust here or point the `custom` engine at your script.
-    """
-
-    name = "omnivoice"
-
-    def load(self) -> None:
-        import torch
-        from omnivoice import OmniVoice
-
-        dtype = getattr(torch, self.cfg.get("dtype", "float16"))
-        log.info("carregando OmniVoice (%s) em %s...", self.cfg.get("model"), self.cfg.get("device"))
-        self.model = OmniVoice.from_pretrained(self.cfg.get("model", "k2-fsa/OmniVoice"),
-                                               device_map=self.cfg.get("device", "cuda:0"), dtype=dtype)
-        self.sample_rate = int(self.cfg.get("sample_rate", 24000))
+    name = "server"
 
     def synthesize(self, text: str, voice: dict) -> bytes:
-        kwargs = {k: voice[k] for k in ("ref_audio", "ref_text", "instruct") if voice.get(k)}
-        audio = self.model.generate(text=text, **kwargs)
-        if isinstance(audio, (list, tuple)):
-            audio = audio[0]
-        return samples_to_wav(audio, self.sample_rate)
+        import json
+        import urllib.error
+        import urllib.request
+
+        url = self.cfg.get("url", "http://127.0.0.1:8766").rstrip("/") + "/synthesize"
+        body = json.dumps({"text": text, "profile": voice.get("profile")}, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(e.read().decode("utf-8", "replace") or f"HTTP {e.code}") from None
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"servidor TTS fora do ar ({e.reason})") from None
 
 
 class CustomEngine(Engine):
@@ -166,30 +161,47 @@ class CustomEngine(Engine):
         return samples_to_wav(samples, int(sr))
 
 
-ENGINES = {e.name: e for e in (DummyEngine, SapiEngine, OmniVoiceEngine, CustomEngine)}
+ENGINES = {e.name: e for e in (DummyEngine, SapiEngine, ServerEngine, CustomEngine)}
 
 
 class TTS:
     """Async wrapper: loads the engine once and serialises synthesis in a worker thread."""
 
     def __init__(self, tts_cfg: dict):
-        engine_name = tts_cfg.get("engine", "dummy")
-        if engine_name not in ENGINES:
-            raise ValueError(f"engine TTS desconhecida: {engine_name} (opções: {', '.join(ENGINES)})")
-        self.engine = ENGINES[engine_name](tts_cfg.get(engine_name, {}))
+        self.cfg = tts_cfg
+        self.engine = self._make(tts_cfg.get("engine", "dummy"))
         self.voices: dict = tts_cfg.get("voices", {})
+        # team (or "default") -> voice profile id on the TTS server; editable from the panel
+        self.team_profiles: dict[str, str] = dict(tts_cfg.get("team_profiles", {}))
         self.error: str | None = None
         self._fallback_cfg = tts_cfg.get("sapi" if sys.platform == "win32" else "dummy", {})
         self._lock = asyncio.Lock()
 
+    def _make(self, name: str) -> Engine:
+        if name not in ENGINES:
+            raise ValueError(f"engine TTS desconhecida: {name} (opções: {', '.join(ENGINES)})")
+        return ENGINES[name](self.cfg.get(name, {}))
+
+    async def set_engine(self, name: str) -> None:
+        """Switch engines at runtime (loads the new one first, keeps the old one on failure)."""
+        engine = self._make(name)
+        async with self._lock:
+            await asyncio.to_thread(engine.load)
+            self.engine, self.error = engine, None
+        log.info("TTS trocado para %s", name)
+
     def voice_for(self, team: str | None) -> dict:
-        return {**self.voices.get("default", {}), **self.voices.get(team or "", {})}
+        voice = {**self.voices.get("default", {}), **self.voices.get(team or "", {})}
+        profile = self.team_profiles.get(team or "") or self.team_profiles.get("default")
+        if profile:
+            voice["profile"] = profile
+        return voice
 
     async def load(self) -> None:
         try:
             await asyncio.to_thread(self.engine.load)
         except Exception as e:
-            # e.g. omnivoice/torch missing in the packaged app: keep running with a basic voice.
+            # e.g. a custom engine whose dependencies are missing: keep running with a basic voice.
             log.exception("falha ao carregar TTS %s; usando voz reserva", self.engine.name)
             self.error = f"{self.engine.name}: {e}"
             self.engine = (SapiEngine if sys.platform == "win32" else DummyEngine)(self._fallback_cfg)

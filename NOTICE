@@ -1,0 +1,25 @@
+Goblin Yapper
+Copyright (c) 2026 NegentropyBeing. Licensed under the MIT License (see LICENSE).
+
+This project's own source code is MIT. It does not include third-party model weights or
+library code; the components below are installed or downloaded separately and remain
+under their own licenses.
+
+OmniVoice (k2-fsa) - https://github.com/k2-fsa/OmniVoice
+  Code: Apache License 2.0.
+  Pre-trained model (k2-fsa/OmniVoice): CC-BY-NC (non-commercial), per its model card.
+
+The OmniVoice model's audio tokenizer is Boson Higgs Audio 2 material:
+
+  Built with Higgs Materials licensed from Boson AI USA, Inc., Copyright Boson AI USA, Inc.,
+  All Rights Reserved and Meta Llama 3 licensed under the Meta Llama 3 Community License,
+  Copyright Meta Platforms, Inc., All Rights Reserved.
+
+  "Meta Llama 3 is licensed under the Meta Llama 3 Community License, Copyright © Meta Platforms, Inc. All Rights Reserved."
+  "Boson Higgs Audio 2 is licensed under the Boson Community License, Copyright © Boson AI USA, Inc. All Rights Reserved."
+
+  Copies of both agreements: third_party/Boson-Higgs-Audio-2-Community-License.txt
+                             third_party/Meta-Llama-3-Community-License.txt
+  Use must follow the Meta Llama 3 Acceptable Use Policy: https://llama.meta.com/llama3/use-policy
+
+Whisper large-v3-turbo (OpenAI), used for transcription: MIT License.

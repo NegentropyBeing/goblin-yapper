@@ -22,6 +22,7 @@ from .app import App
 from .teams import SorterError
 from .server import make_web_app
 from .tts import TTS
+from .tts_service import TTSService
 
 log = logging.getLogger("goblin_yapper")
 
@@ -72,7 +73,14 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
 
     tts = TTS(cfg.get("tts", {}))
     app = App(cfg, tts, settings_path=data_dir / "settings.json")
+    # settings.json (merged into app.cfg) may pick another engine than config.toml
+    tts.cfg = app.cfg.get("tts", {})
+    tts.engine = tts._make(tts.cfg.get("engine", "dummy"))
     await tts.load()
+
+    app.tts_service = TTSService(tts.cfg.get("server", {}), data_dir)
+    if app.tts_service.autostart:
+        await app.tts_service.start()
 
     srv = app.cfg.get("server", {})
     host, port = args.host or srv.get("host", "127.0.0.1"), args.port or int(srv.get("port", 8765))
@@ -99,6 +107,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
         worker.cancel()
         if app.chat_task:
             app.chat_task.cancel()
+        await app.tts_service.close()
         await runner.cleanup()
 
 

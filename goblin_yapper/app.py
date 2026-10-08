@@ -102,6 +102,7 @@ class App:
         self.sorter = TeamSorter(tcfg.get("count", 2), tcfg.get("auto_assign_late", True))
         self.sorter.queue_open = tcfg.get("queue_open_on_start", False)
         self.voice = VoiceController(self.sorter)
+        self.tts.team_profiles.update(self.cfg.get("tts", {}).get("team_profiles", {}))
         self.tints = load_tints(tcfg)
         tw = self.cfg.get("twitch", {})
         self.join_cmds = {c.lower() for c in tw.get("join_commands", ["!joinsort", "!joinsorting"])}
@@ -114,6 +115,7 @@ class App:
         self.gen = 0                       # bumped on stop/speaker change to discard stale speech
         self.ids = itertools.count(1)
         self.speaking: Utterance | None = None
+        self.tts_service = None  # TTSService, set by __main__
         self.channel: str = ""
         self.chat_status = "desligado"
         self.chat_task: asyncio.Task | None = None
@@ -168,6 +170,7 @@ class App:
             "chat": {"channel": self.channel, "status": self.chat_status},
             "tts_engine": self.tts.engine.name,
             "tts_error": self.tts.error,
+            "team_profiles": self.tts.team_profiles,
             "data_dir": str(self.settings_path.parent) if self.settings_path else None,
         }
 
@@ -220,8 +223,9 @@ class App:
                 continue
             try:
                 wav = await self.tts.synthesize(utt.text, utt.team)
-            except Exception:
-                log.exception("falha no TTS")
+            except Exception as e:
+                log.warning("falha no TTS: %s", e)
+                await self.broadcast({"type": "notice", "text": f"TTS falhou: {e}"})
                 continue
             if utt.gen != self.gen:
                 continue
@@ -273,6 +277,8 @@ class App:
   stop                      tira a voz / para o áudio
   channel <canal|off>       conecta ao chat de outro canal
   tint <time> <#cor|off> [força 0-1]   muda a tinta do goblin do time
+  teamvoice <time|default> <perfil|none>   perfil de voz do time (aba Voz)
+  engine <server|sapi|dummy>                motor de TTS
   test <time> <texto>       testa o TTS/goblin de um time
   state                     mostra o estado"""
 
@@ -293,6 +299,16 @@ class App:
                 team = None if args[0] in (QUEUE, "-", "none") else args[0].lower()
                 ok = await self.say("teste", " ".join(args[1:]), team=team)
                 return "enviado ao TTS" if ok else "ignorado"
+            if cmd == "engine":
+                if not args:
+                    raise SorterError("uso: engine <server|sapi|dummy|custom>")
+                try:
+                    await self.tts.set_engine(args[0].lower())
+                except Exception as e:
+                    raise SorterError(f"não consegui trocar para {args[0]}: {e}")
+                self.persist({"tts": {"engine": self.tts.engine.name}})
+                await self.broadcast(self.state())
+                return f"TTS: {self.tts.engine.name}"
             out = self._mutate(cmd, args, s, v)
             # Speaker removed from the game loses the voice too.
             if cmd in ("remove", "clear") and v.active and s.where(v.active) is None:
@@ -363,6 +379,19 @@ class App:
                     raise SorterError("força deve ser um número entre 0 e 1")
             self.persist({"teams": {"tint": {team: dict(tint)}}})
             return f"tinta {team}: {tint['color']} força {tint['strength']:.2f}"
+        if cmd == "teamvoice":
+            need(2, "teamvoice <time|default> <perfil|none>")
+            team = args[0].lower()
+            if team != "default" and team not in self.tints:
+                raise SorterError(f"time desconhecido: {team}")
+            if args[1].lower() == "none":
+                self.tts.team_profiles.pop(team, None)
+            else:
+                self.tts.team_profiles[team] = args[1]
+            # replace (not merge) so removals are saved too
+            self.settings.setdefault("tts", {})["team_profiles"] = dict(self.tts.team_profiles)
+            self.persist({})
+            return f"voz de {team}: {self.tts.team_profiles.get(team, 'padrão')}"
         if cmd == "channel":
             need(1, "channel <canal|off>")
             channel = "" if args[0].lower() == "off" else args[0]
