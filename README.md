@@ -2,6 +2,241 @@
 
 # Goblin Yapper
 
+> **English:** the English version of this README is [further down this page](#english).
+
+Sorteio de times para a Twitch + overlay de "goblin" com TTS para o OBS. Notas de design originais:
+[docs/SPEC.md](docs/SPEC.md).
+
+```
+Chat da Twitch (IRC anônimo) ──► sorteio de times (!joinsort) ──► controle de voz (quem fala)
+                                                                     │ mensagens de quem está com a voz
+                                                                     ▼
+Fonte de navegador do OBS ◄── WebSocket + /audio/<id>.wav ◄── engine de TTS (dummy | sapi | omnivoice | custom)
+(goblin png ⇄ gif + tinta)
+
+App desktop (Tauri) ── inicia ──► backend Python (sidecar exe) ── serve ──► /panel  /overlay  /api
+```
+
+## Instalação e execução (PowerShell)
+
+Todos os comandos são de PowerShell, executados na pasta do projeto (a raiz do repositório).
+
+**Primeira configuração**
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+cd app; npm install; cd ..
+.\tts_server\setup.ps1          # servidor de voz: PyTorch CUDA + OmniVoice (vários GB)
+```
+
+**Iniciar o backend a partir do código-fonte** (código Python mais recente; também inicia o servidor de TTS)
+
+```powershell
+.venv\Scripts\python -m goblin_yapper --data-dir "$env:APPDATA\com.goblinyapper.desktop"
+```
+
+Deixe-o rodando. O app o detecta na porta 8765 e o usa no lugar do backend embutido.
+Sem o app, abra o painel no navegador: `http://127.0.0.1:8765/panel`.
+
+**Abrir o app**
+
+```powershell
+# último build compilado (debug)
+& ".\app\src-tauri\target\debug\goblin-yapper.exe"
+
+# build de release (gerado pelo build.ps1)
+& ".\app\src-tauri\target\release\goblin-yapper.exe"
+```
+
+Feche o app antes de reiniciar o backend: o servidor que estiver ocupando a porta 8765 é o que será usado.
+
+**Recompilar o app sem gerar o instalador**
+
+```powershell
+cd app; npx tauri build --debug --no-bundle; cd ..   # -> app\src-tauri\target\debug\goblin-yapper.exe
+cd app; npx tauri dev; cd ..                          # ou: compila e abre em um passo só
+```
+
+Necessário depois de mudar o ícone, a tela de carregamento (`app/src/index.html`) ou o `main.rs`.
+Mudanças no painel e no overlay só exigem reiniciar o backend a partir do código-fonte.
+
+**Gerar o instalador (.msi)**
+
+```powershell
+.\build.ps1
+# -> app\src-tauri\target\release\bundle\msi\Goblin Yapper_0.1.0_x64_pt-BR.msi
+```
+
+**Rodar os testes**
+
+```powershell
+.venv\Scripts\python -m pytest
+```
+
+**Logs e dados**
+
+```powershell
+Get-Content "$env:APPDATA\com.goblinyapper.desktop\goblin-yapper.log" -Tail 30   # log do backend
+explorer "$env:APPDATA\com.goblinyapper.desktop"                                 # config, settings, assets
+```
+
+## App desktop (instalador para Windows)
+
+O `build.ps1` roda os testes, congela o backend com o PyInstaller em
+`app/src-tauri/binaries/goblin-yapper-server-<target>.exe` e depois o `tauri build` empacota o app,
+o backend e o instalador do WebView2 em um `.msi`. Requer Python 3.13, Rust e Node.
+
+App instalado:
+- a janela é o painel do operador (`/panel`): arrastar chatters entre times, botões de voz, seletores de tinta,
+  upload das imagens do goblin e URLs do overlay para copiar no OBS.
+- os dados do usuário ficam em `%APPDATA%\com.goblinyapper.desktop\` — `config.toml`, `settings.json`
+  (alterações feitas no painel), `assets\`, `tts\` (perfis de voz, log do servidor de TTS), `goblin-yapper.log`.
+- **voz, primeira execução**: o instalador é pequeno e só traz o código do servidor de TTS. Na aba **Voz**,
+  clique em **Instalar servidor de voz**: ele baixa o [uv](https://github.com/astral-sh/uv) (versão fixa, checksum
+  verificado), um Python 3.13 independente, o PyTorch com CUDA 12.8 e o OmniVoice (~3,5 GB de download, ~8 GB em
+  disco) em `%LOCALAPPDATA%\GoblinYapper\voice-runtime\` e depois inicia o servidor. O modelo de voz (~3 GB) é
+  baixado para o cache do Hugging Face na primeira vez que o servidor inicia. Não é preciso ter Python instalado
+  no sistema.
+- desinstalar o app mantém o runtime de voz e os seus dados; apague `%LOCALAPPDATA%\GoblinYapper\` e
+  `%APPDATA%\com.goblinyapper.desktop\` para removê-los.
+- um backend rodando a partir do código-fonte continua funcionando junto: inicie-o **antes** de abrir o app, e o
+  app se conecta a ele na porta 8765 em vez de iniciar o seu próprio.
+
+## Comandos do chat da Twitch
+
+O que os espectadores digitam no chat:
+
+| comando | o que faz |
+|---------|-----------|
+| `!joinsort` ou `!joinsorting` | Entra na fila. Só funciona com a fila **aberta**. Depois do sorteio, quem entra atrasado vai direto para o menor time (`auto_assign_late`). |
+| `!leavesort` | Sai da fila ou do time. |
+
+Quem **está com a voz** não digita comando: as mensagens normais dessa pessoa no chat são lidas pelo TTS e o
+goblin do time dela fala. Antes da leitura:
+
+- mensagens que começam com `!` são ignoradas (`skip_commands`)
+- links e emotes da Twitch são removidos
+- no máximo 5 mensagens ficam esperando; as que passarem disso são descartadas (`max_queue`)
+
+Os nomes dos comandos e os limites ficam no `config.toml` (`[twitch]` e `[tts]`).
+
+## Comandos do operador
+
+O que você usa para conduzir a dinâmica: os botões do painel, o console (`help`, quando o backend roda a partir
+do código-fonte em um terminal) e a API HTTP usam os mesmos comandos. `<time>` é `azul`, `verde`, `roxo` ou
+`amarelo`.
+
+| comando | o que faz |
+|---------|-----------|
+| `open` / `close` | Abre ou fecha a fila do `!joinsort` |
+| `teams <1-4>` | Número de times. Ao diminuir, os membros dos times removidos vão para os outros |
+| `sort` | Sorteia todos da fila em times equilibrados |
+| `resort` | Devolve todos à fila e sorteia de novo |
+| `reset` | Devolve todos os membros dos times à fila |
+| `clear` | Esvazia a fila e todos os times |
+| `add <user>` | Adiciona alguém manualmente (funciona mesmo com a fila fechada) |
+| `move <user> <time\|fila>` | Move alguém para outro time, ou de volta para a fila (`fila`) |
+| `remove <user>` | Remove alguém completamente |
+| `voice <time>` | Dá a voz a uma pessoa aleatória daquele time |
+| `voice any` | Dá a voz a uma pessoa aleatória de qualquer time |
+| `voice` / `next [time]` | Outra pessoa daquele time (padrão: o time de quem falou por último) |
+| `give <user>` | Dá a voz a uma pessoa específica (ela não precisa estar em um time) |
+| `stop [time\|user]` | Tira a voz e corta o áudio (sem argumento: de todos) |
+| `multivoice <on\|off>` | Uma pessoa com a voz por time ao mesmo tempo; as falas continuam tocando uma de cada vez |
+| `channel <canal\|off>` | Conecta ao chat de um canal (nome ou link colado) ou desconecta |
+| `tint <time> <#rrggbb\|off> [0-1]` | Cor e intensidade da tinta do goblin do time |
+| `teamvoice <time\|default> <perfil\|none>` | Perfil de voz com que um time fala (aba Voz) |
+| `engine <server\|sapi\|dummy>` | Troca a engine de TTS |
+| `test <time> <texto>` | Faz o goblin daquele time dizer uma frase de teste |
+| `state` | Mostra a fila, os times e quem está com a voz |
+
+O painel roda em `http://127.0.0.1:8765/panel` (também funciona no navegador ou como dock personalizado do OBS).
+API HTTP:
+
+```
+POST /api/command   {"command": "sort"}
+GET  /api/state
+WS   /ws            (envios de state / speak / idle / stop / assets)
+```
+
+## OBS
+
+Adicione uma **Fonte de navegador** em `http://127.0.0.1:8765/overlay` (fundo transparente).
+Ative "Controlar áudio pelo OBS" se quiser o TTS em um canal próprio do mixer.
+
+- `?team=azul&audio=0` para fixar um goblin por time (uma fonte por time); deixe **uma** fonte com o áudio ligado.
+- `?size=400`, `?label=0`.
+
+As imagens do goblin ficam em `assets/`: `goblin.png` (parado) + `goblin.gif` (falando). Cada time recebe o
+mesmo goblin tingido com a sua cor, definida por time no `config.toml` (`[teams.tint.azul] color / strength`)
+ou ao vivo com `tint azul #1e40ff 0.7` / `tint azul off`. Um goblin neutro/acinzentado fica melhor tingido.
+Imagens por time (`azul.png` / `azul.gif`), se existirem, substituem as compartilhadas.
+Sem imagens, é usado o goblin goburin embutido (desenhado em SVG, tingido por time).
+
+## Voz (servidor de TTS + aba "Voz")
+
+A voz roda em um **servidor de TTS** separado (`tts_server/`): um ambiente Python próprio com PyTorch (CUDA) e
+OmniVoice, que carrega o modelo na GPU uma única vez. O backend o inicia automaticamente e o encerra ao sair
+(`[tts.server] autostart`). Se já houver um rodando em `[tts.server] url`, esse é usado.
+
+```
+backend (goblin_yapper) ──HTTP──► servidor de TTS (tts_server/server.py) ──► engine (engines/omnivoice_engine.py)
+     proxy /api/tts/*                 perfis, pipeline, parâmetros                  OmniVoice na GPU
+```
+
+A aba **Voz** do painel (`/panel#voz`):
+
+- **status**: modelo carregando / pronto, GPU e VRAM, botão de reiniciar, troca de engine (OmniVoice / Windows / teste)
+- **novo perfil**: arraste um `.wav` → preparar (mono, 24 kHz, cortar silêncio, normalizar, duração máxima) →
+  transcrever com o Whisper → revisar/editar a transcrição → criar. O clone de voz é calculado uma vez e salvo.
+- **perfis**: ouvir a referência, editar nome/transcrição (recria a voz), parâmetros por perfil, excluir
+- **parâmetros**: todos os parâmetros do OmniVoice (idioma, velocidade, passos de decodificação, guidance,
+  denoise, ...), como padrões globais ou ajustes de um perfil específico
+- **teste**: digite uma frase, escolha um perfil e ouça (usa os valores do formulário, mesmo sem salvar)
+- **vozes dos times**: qual perfil cada time usa; times sem perfil usam o padrão
+
+Os perfis ficam na pasta de dados: `tts\profiles\<id>\` (`reference.wav`, `profile.json`, `omnivoice.pt`).
+O `.wav` e a transcrição são a fonte, então outra engine pode reconstruir o próprio cache a partir deles.
+Log do servidor: `tts\tts-server.log`.
+
+**Trocar a engine de TTS no futuro**: adicione `tts_server/engines/<nome>_engine.py` com uma subclasse de
+`Engine` (`params()`, `transcribe()`, `build_profile()`, `synthesize()`; veja `engines/base.py`), registre-a em
+`engines/__init__.py` e defina `[tts.server] engine = "<nome>"`. A aba Voz monta o formulário a partir do
+`params()` da engine, então nada no app precisa mudar.
+
+Outras engines (`[tts] engine` no `config.toml`, ou a troca na aba Voz):
+
+| engine   | o que é                                                         |
+|----------|-----------------------------------------------------------------|
+| `server` | o servidor de TTS acima (padrão)                                |
+| `sapi`   | vozes do Windows (`[tts.sapi] voice = "Microsoft Maria Desktop"` para pt-BR) |
+| `dummy`  | bipes que imitam fala, para testar sem GPU                      |
+| `custom` | sua própria função Python, veja `scripts/my_tts.py`             |
+
+## Licença
+
+O código do próprio Goblin Yapper é **MIT** (veja [LICENSE](LICENSE)). Ele não inclui pesos de modelos nem
+código de bibliotecas de terceiros; esses são instalados pelo `tts_server/setup.ps1` ou baixados no primeiro
+uso, e mantêm as suas próprias licenças. Veja o [NOTICE](NOTICE) para as atribuições completas.
+
+- **OmniVoice** (k2-fsa): código Apache-2.0; o **modelo pré-treinado é CC-BY-NC — somente uso não comercial**.
+  Usar a voz do OmniVoice em lives monetizadas pode contar como uso comercial; confira os termos do modelo.
+  A engine é substituível (veja "Trocar a engine de TTS no futuro") se você precisar de um modelo com licença
+  comercial.
+- O tokenizador de áudio do modelo OmniVoice (atribuição exigida, mantida no original em inglês):
+  **Built with Higgs Materials licensed from Boson AI USA, Inc., Copyright Boson AI USA, Inc., All Rights
+  Reserved and Meta Llama 3 licensed under the Meta Llama 3 Community License, Copyright Meta Platforms, Inc.,
+  All Rights Reserved.** Os contratos estão em [third_party/](third_party/); o uso deve seguir a
+  [Política de Uso Aceitável do Meta Llama 3](https://llama.meta.com/llama3/use-policy).
+- **Whisper** (OpenAI, transcrição): MIT.
+
+Só clone vozes com a permissão de quem fala.
+
+---
+
+# English
+
 Twitch team sorter + TTS "goblin" overlay for OBS. Original design notes: [docs/SPEC.md](docs/SPEC.md).
 
 ```
