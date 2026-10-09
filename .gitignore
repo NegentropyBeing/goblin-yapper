@@ -11,3 +11,9 @@ app/src-tauri/target/
 app/src-tauri/binaries/
 app/src-tauri/gen/
 tts_server/.venv/
+
+# local data dir when running from source with the default --data-dir "."
+/config.toml
+/assets/
+/tts/
+/voices/

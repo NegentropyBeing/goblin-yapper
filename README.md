@@ -1,6 +1,8 @@
+<p align="center"><img src="docs/goburin.png" alt="Goburin, the Goblin Yapper goblin" width="280"></p>
+
 # Goblin Yapper
 
-Twitch team sorter + TTS "goblin" overlay for OBS. Spec: [Predicates.md](Predicates.md).
+Twitch team sorter + TTS "goblin" overlay for OBS. Original design notes: [docs/SPEC.md](docs/SPEC.md).
 
 ```
 Twitch chat (anonymous IRC) ──► team sorter (!joinsort) ──► voice controller (who speaks)
@@ -14,8 +16,7 @@ Desktop app (Tauri) ── starts ──► Python backend (sidecar exe) ── 
 
 ## Setup and run (PowerShell)
 
-All commands are PowerShell, run from the project folder
-(the repository root).
+All commands are PowerShell, run from the project folder (the repository root).
 
 **First-time setup**
 

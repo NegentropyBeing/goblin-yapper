@@ -1,6 +1,6 @@
 """Who currently "has the voice" (whose chat messages get read by TTS).
 
-Ruleset (from Predicates.md):
+Ruleset (from docs/SPEC.md):
   * operator presses a button -> a random chatter from a team gets the voice
   * that chatter's messages are read by TTS while active
   * operator can stop it
