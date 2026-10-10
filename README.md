@@ -98,6 +98,8 @@ de cada time. As vozes do Windows também estão disponíveis como alternativa.
 Para rodar a partir do código-fonte, gerar o instalador, usar a API HTTP ou trocar a engine de TTS, veja
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Notas de design originais: [docs/SPEC.md](docs/SPEC.md).
 
+Vai testar o projeto sem ser programador? Siga o [guia de teste passo a passo](docs/TESTE.md).
+
 ## Licença
 
 O código do Goblin Yapper é **MIT** (veja [LICENSE](LICENSE)). Modelos e bibliotecas de terceiros são baixados
@@ -210,6 +212,9 @@ Windows voices are also available as an alternative.
 
 To run from source, build the installer, use the HTTP API or swap the TTS engine, see
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Original design notes: [docs/SPEC.md](docs/SPEC.md).
+
+Testing the project without being a programmer? Follow the [step-by-step test guide](docs/TESTE.md) (in
+Portuguese).
 
 ## License
 
