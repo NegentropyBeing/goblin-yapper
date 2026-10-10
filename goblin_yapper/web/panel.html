@@ -512,7 +512,8 @@ function renderUrls(teams) {
       <span style="width:96px;color:${team ? teamColor(team) : "var(--muted)"};font-size:12px;text-transform:capitalize">${label}</span>
       <code>${esc(url)}</code><button class="icon" data-copy="${esc(url)}">copiar</button></div>`;
   }).join("") + `<p class="hint" style="margin-top:6px">Cada fonte de time mostra o goblin e toca só as falas do seu time.
-    A principal toca as falas dos times sem fonte própria. O ponto verde indica que a fonte está aberta no OBS.</p>`;
+    A principal toca as falas dos times sem fonte própria. O ponto verde indica que a fonte está aberta no OBS.
+    O goblin ocupa a fonte inteira: ajuste o tamanho pela largura e altura da fonte no OBS (640 × 400 encaixa bem).</p>`;
   if ($("#urls").innerHTML !== html) $("#urls").innerHTML = html;
 }
 

@@ -11,6 +11,9 @@
   full voice pipeline, with that team's voice profile.
 - The panel shows which OBS sources are connected; the tint slider is thinner.
 - Team source URLs no longer need `&audio=0`. Existing sources that have it stay silent, as before.
+- The overlay's goblin now fills the whole browser source (with a strip for the name) instead of sitting in a
+  fixed 360 px box, so the OBS source's bounds match the image. `?size=N` keeps the old fixed box.
+- The built-in goblin's ear bite is a real transparent cut-out, as in the original drawing, instead of a white dot.
 - Deleting a voice profile is now recorded in `tts\tts-server.log` (time, name and id).
 - The Voz tab shows the folder the profiles are saved in ("Perfis salvos em: …"), as reported by the voice
   server itself, so it is clear which data folder's profiles are listed.

@@ -63,7 +63,10 @@ emotes não são lidos, e no máximo 5 mensagens ficam esperando; o resto é des
 - Cada fala toca em uma única fonte, então não há som duplicado. No painel, um ponto verde ao lado de cada URL
   indica que a fonte está aberta no OBS. Sem nenhuma fonte aberta, o próprio app toca a fala (bom para testar).
 - Ative "Controlar áudio pelo OBS" em cada fonte para ter cada time num canal próprio do mixer.
-- Outras opções: `?size=400` (tamanho), `?label=0` (esconde o nick), `?audio=0` (fonte sem som).
+- **Tamanho**: o goblin ocupa a fonte inteira, com uma faixa embaixo para o nick. Defina o tamanho pela largura
+  e altura da própria fonte no OBS; para o goblin embutido, 640 × 400 encaixa bem (640 × 360 sem o nick).
+- Outras opções: `?label=0` (esconde o nick e a faixa), `?audio=0` (fonte sem som), `?size=400` (goblin numa
+  caixa fixa de 400 px, em vez de ocupar a fonte).
 - O painel também funciona como dock personalizado do OBS: `http://127.0.0.1:8765/panel`.
 
 ### Imagens do goblin
@@ -178,7 +181,10 @@ and emotes are skipped, and at most 5 messages wait in line; the rest are droppe
 - Each line plays in exactly one source, so sound is never doubled. In the panel, a green dot next to each URL
   means that source is open in OBS. With no source open, the app itself plays the line (handy for testing).
 - Enable "Control audio via OBS" on each source to put each team on its own mixer channel.
-- Other options: `?size=400` (size), `?label=0` (hide the name), `?audio=0` (silent source).
+- **Size**: the goblin fills the whole source, with a strip at the bottom for the name. Set the size with the
+  source's own width and height in OBS; for the built-in goblin, 640 × 400 fits well (640 × 360 without the name).
+- Other options: `?label=0` (hide the name and its strip), `?audio=0` (silent source), `?size=400` (goblin in a
+  fixed 400 px box instead of filling the source).
 - The panel also works as an OBS custom dock: `http://127.0.0.1:8765/panel`.
 
 ### Goblin images
