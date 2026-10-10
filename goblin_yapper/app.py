@@ -111,6 +111,8 @@ class App:
         self.leave_cmds = {c.lower() for c in tw.get("leave_commands", ["!leavesort"])}
         self.tts_cfg = self.cfg.get("tts", {})
         self.clients: set = set()          # overlay/frontend websockets
+        # websocket -> {"role": "overlay" | "panel", "team": pinned team | None, "audio": bool}
+        self.overlays: dict = {}
         self.audio: dict[int, bytes] = {}  # utterance id -> wav, served at /audio/<id>.wav
         self.speech_q: asyncio.Queue[Utterance] = asyncio.Queue()
         self.ended = asyncio.Event()
@@ -171,6 +173,9 @@ class App:
                       "team": self.voice.active_team},
             "speakers": [{"id": u, "user": self.sorter.name(u), "team": t} for u, t in self.voice.speakers()],
             "multi_voice": self.voice.multi,
+            # OBS sources currently connected (panels, which only play as a last resort, aren't listed)
+            "overlays": [{"team": info["team"], "audio": info["audio"]} for ws, info in self.overlays.items()
+                         if ws in self.clients and info.get("role", "overlay") == "overlay"],
             "speaking": self.speaking.team if self.speaking else None,
             "tints": self.tints,
             "chat": {"channel": self.channel, "status": self.chat_status},
@@ -180,13 +185,28 @@ class App:
             "data_dir": str(self.settings_path.parent) if self.settings_path else None,
         }
 
+    async def _send(self, ws, msg: dict) -> None:
+        try:
+            await ws.send_str(json.dumps(msg))
+        except Exception:
+            self.clients.discard(ws)
+            self.overlays.pop(ws, None)
+
     async def broadcast(self, msg: dict) -> None:
-        data = json.dumps(msg)
         for ws in list(self.clients):
-            try:
-                await ws.send_str(data)
-            except Exception:
-                self.clients.discard(ws)
+            await self._send(ws, msg)
+
+    def pick_player(self, team: str | None):
+        """The one client that plays a line's audio: the team's own (pinned) overlay if it has
+        audio on, else the main (unpinned) overlay, else an open panel (so voices can be tested
+        without OBS), else nobody."""
+        audible = [(ws, info) for ws, info in self.overlays.items() if info["audio"] and ws in self.clients]
+        overlays = [(ws, info) for ws, info in audible if info.get("role", "overlay") == "overlay"]
+        for wanted in ([team] if team else []) + [None]:
+            for ws, info in overlays:
+                if info["team"] == wanted:
+                    return ws
+        return next((ws for ws, info in audible if info.get("role") == "panel"), None)
 
     # ---- chat ----------------------------------------------------------
 
@@ -250,10 +270,18 @@ class App:
             self.speaking = utt
             self.ended.clear()
             log.info("[%s/%s] %s", utt.display, utt.team or "-", utt.text)
-            await self.broadcast({"type": "speak", "id": utt.id, "url": f"/audio/{utt.id}.wav",
-                                  "team": utt.team, "user": utt.display, "text": utt.text})
+            # Everyone gets the line (to animate); exactly one overlay is told to play its audio.
+            player = self.pick_player(utt.team)
+            msg = {"type": "speak", "id": utt.id, "url": f"/audio/{utt.id}.wav",
+                   "team": utt.team, "user": utt.display, "text": utt.text}
+            for ws in list(self.clients):
+                await self._send(ws, {**msg, "play": ws is player})
+            if player is None:
+                await self.broadcast({"type": "notice", "text":
+                                      f"nenhum overlay com áudio para {'o time ' + utt.team if utt.team else 'quem está sem time'}"})
             try:
-                await asyncio.wait_for(self.ended.wait(), timeout=wav_duration(wav) + 3)
+                # without a player nobody will report the end: just animate for the clip's length
+                await asyncio.wait_for(self.ended.wait(), timeout=wav_duration(wav) + (3 if player else 0))
             except asyncio.TimeoutError:
                 log.debug("overlay não confirmou fim do áudio %s", utt.id)
             self.speaking = None
@@ -303,6 +331,7 @@ class App:
   teamvoice <time|default> <perfil|none>   perfil de voz do time (aba Voz)
   engine <server|sapi|dummy>                motor de TTS
   test <time> <texto>       testa o TTS/goblin de um time
+  testvoice <time>          o goblin do time diz uma frase fixa com a voz do time
   state                     mostra o estado"""
 
     async def command(self, line: str) -> str:
@@ -322,6 +351,14 @@ class App:
                 team = None if args[0] in (QUEUE, "-", "none") else args[0].lower()
                 ok = await self.say("teste", " ".join(args[1:]), team=team)
                 return "enviado ao TTS" if ok else "ignorado"
+            if cmd == "testvoice":
+                # fixed phrase through the whole pipeline: TTS engine -> the team's voice profile -> its overlay
+                team = args[0].lower() if args else ""
+                if team not in s.teams:
+                    raise SorterError(f"uso: testvoice <time> ({', '.join(s.teams)})")
+                phrase = self.tts_cfg.get("test_phrase", "Fala chat! Aqui é o goblin do time {team}.").replace("{team}", team)
+                ok = await self.say(f"teste {team}", phrase, team=team)
+                return f"testando a voz do time {team}" if ok else "fila de testes cheia, aguarde"
             if cmd == "engine":
                 if not args:
                     raise SorterError("uso: engine <server|sapi|dummy|custom>")

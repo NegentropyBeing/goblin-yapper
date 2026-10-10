@@ -35,6 +35,7 @@ port = 8765
 engine = "server"            # server (OmniVoice, perfis de voz) | sapi | dummy | custom
 max_queue = 5                # mensagens na fila de fala antes de descartar
 skip_commands = true         # não ler mensagens que começam com "!"
+test_phrase = "Fala chat! Aqui é o goblin do time {team}."   # dita pelo botão "Testar voz" de cada time
 
 [tts.sapi]
 voice = ""                   # ex: "Microsoft Maria Desktop" (vazio = padrão do Windows)

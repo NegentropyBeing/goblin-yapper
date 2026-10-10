@@ -8,7 +8,9 @@
   GET    /api/assets           goblin images per team
   PUT    /api/assets/<file>    upload goblin.png / goblin.gif / <team>.png / <team>.gif (raw body)
   DELETE /api/assets/<file>
-  WS     /ws                   pushes state/speak/idle/stop/assets; accepts {"type": "ended", "id": n}
+  WS     /ws                   pushes state/speak/idle/stop/assets; accepts {"type": "ended", "id": n} and an
+                               overlay's {"type": "hello", "role": "overlay", "team": ..., "audio": bool}.
+                               "speak" carries play=true for the one overlay that should play the audio.
   GET    /api/tts-service      TTS server process status (+ the server's own /status)
   POST   /api/tts-service/restart
   POST   /api/tts-service/install  first-run install of the voice runtime (installed app)
@@ -118,8 +120,17 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
                 data = json.loads(msg.data)
                 if data.get("type") == "ended":
                     app.on_audio_ended(int(data["id"]))
+                elif data.get("type") == "hello" and data.get("role") in ("overlay", "panel"):
+                    # an overlay says which team it is pinned to and whether it plays audio;
+                    # a panel offers itself as the last-resort player (when no overlay can play a line)
+                    team = data.get("team")
+                    app.overlays[ws] = {"role": data["role"], "team": team if team in TEAM_NAMES else None,
+                                        "audio": bool(data.get("audio"))}
+                    await app.broadcast(app.state())
         finally:
             app.clients.discard(ws)
+            if app.overlays.pop(ws, None) is not None:
+                await app.broadcast(app.state())
         return ws
 
     async def tts_service_status(_):

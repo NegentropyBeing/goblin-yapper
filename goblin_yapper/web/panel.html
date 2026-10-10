@@ -64,7 +64,12 @@
   .preview { width: 64px; height: 64px; border: 0; border-radius: 8px; background: var(--bg); flex: none; pointer-events: none; color-scheme: normal; }
   .tint { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .tint input[type=color] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
-  .tint input[type=range] { flex: 1; min-width: 50px; accent-color: var(--team); }
+  /* thin tint bar: filled up to --pct (set from the value) in the team color */
+  .tint input[type=range] { flex: 1; min-width: 50px; height: 4px; border-radius: 2px; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    background: linear-gradient(to right, var(--team) var(--pct, 50%), var(--line) var(--pct, 50%)); }
+  .tint input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 11px; height: 11px;
+    border-radius: 50%; background: var(--team); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--team); }
   .members { list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 5px; overflow: auto; flex: 1; min-height: 60px; }
   .members:empty::after { content: attr(data-empty); color: var(--muted); font-size: 12px; text-align: center; padding: 14px 0; }
   .chip { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; background: var(--panel-2); border: 1px solid var(--line);
@@ -85,12 +90,17 @@
   .urls { display: flex; flex-direction: column; gap: 5px; }
   .url { display: flex; gap: 6px; align-items: center; }
   .url code { flex: 1; background: var(--bg); padding: 5px 8px; border-radius: 6px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .uploads { display: flex; gap: 12px; flex-wrap: wrap; }
-  .upload { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; background: var(--bg); border: 1px dashed var(--line); border-radius: var(--radius); width: 150px; }
+  #uploads { display: flex; flex-direction: column; gap: 8px; }
+  .up-row { display: grid; grid-template-columns: 70px 1fr 1fr; gap: 8px; align-items: center; }
+  .up-row b { text-transform: capitalize; color: var(--team, var(--text)); font-size: 13px; }
+  .upload { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg); border: 1px dashed var(--line);
+    border-radius: var(--radius); min-width: 0; cursor: pointer; }
   .upload.drop { border-color: var(--accent); }
-  .upload img { width: 90px; height: 90px; object-fit: contain; }
-  .upload .ph { width: 90px; height: 90px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
-  .upload .label { font-size: 12px; color: var(--muted); }
+  .upload img { width: 48px; height: 48px; object-fit: contain; flex: none; }
+  .upload img.fallback { opacity: .3; }
+  .upload .ph { width: 48px; height: 48px; flex: none; display: grid; place-items: center; color: var(--muted); font-size: 10px; text-align: center; line-height: 1.1; }
+  .upload .label { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+  .drawer-body { max-height: 46vh; overflow: auto; }
 
   #toast { position: fixed; right: 16px; bottom: 16px; max-width: 420px; padding: 10px 14px; border-radius: var(--radius); background: var(--panel-2);
     border: 1px solid var(--line); white-space: pre-wrap; font-size: 13px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
@@ -220,11 +230,10 @@
       <div class="pill" id="dataInfo"></div>
     </div>
     <div>
-      <h3>Imagens (tingidas por time)</h3>
-      <div class="uploads">
-        <label class="upload" data-file="goblin.png"></label>
-        <label class="upload" data-file="goblin.gif"></label>
-      </div>
+      <h3>Imagens do goblin</h3>
+      <p class="hint" style="margin:0 0 8px">Cada time pode ter o seu par png + gif; sem imagem própria, usa o padrão.
+        A tinta de cada time (na coluna do time) é aplicada por cima.</p>
+      <div id="uploads"></div>
     </div>
   </div>
 </details>
@@ -340,13 +349,32 @@ async function cmd(command, { quiet = false } = {}) {
   } catch (e) { toast("servidor indisponível", true); return false; }
 }
 
+// Last-resort player: the server only asks the panel to play a line (msg.play) when no OBS overlay
+// can, so voices can be tested without OBS open.
+const panelAudio = new Audio();
+let panelLine = null;
+function panelPlay(msg) {
+  panelLine = msg.id;
+  const done = () => { if (panelLine === msg.id) { panelLine = null; ws.send(JSON.stringify({ type: "ended", id: msg.id })); } };
+  panelAudio.src = msg.url;
+  panelAudio.onended = panelAudio.onerror = done;
+  panelAudio.play().catch(done);
+}
+
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => $("#offline").classList.remove("show");
+  ws.onopen = () => {
+    $("#offline").classList.remove("show");
+    ws.send(JSON.stringify({ type: "hello", role: "panel", team: null, audio: true }));
+  };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "state") { state = msg; render(); }
-    else if (msg.type === "speak" || msg.type === "idle" || msg.type === "stop") setTalking(msg.type === "speak" ? msg.team : null, msg.type === "speak");
+    else if (msg.type === "speak" || msg.type === "idle" || msg.type === "stop") {
+      setTalking(msg.type === "speak" ? msg.team : null, msg.type === "speak");
+      if (msg.type === "speak" && msg.play) panelPlay(msg);
+      else if (msg.type !== "speak" && panelLine === msg.id) { panelLine = null; panelAudio.pause(); }
+    }
     else if (msg.type === "assets") loadAssets();
     else if (msg.type === "notice") toast(msg.text, true);
   };
@@ -379,6 +407,7 @@ function render() {
 
   renderBoard(teams);
   renderUrls(teams);
+  renderUploads(teams);
   $("#dataInfo").textContent = `${state.data_dir || "-"}  ·  TTS: ${state.tts_engine}` +
     (state.tts_error ? `  (falha ao carregar: ${state.tts_error})` : "");
   vzOnState();
@@ -403,14 +432,18 @@ function renderBoard(teams) {
       $(".tint-color", col).value = tint.color;
       $(".tint-strength", col).value = Math.round(tint.strength * 100);
     }
+    $(".tint-strength", col).style.setProperty("--pct", $(".tint-strength", col).value + "%");
     $(".count", col).textContent = state.teams[t].length;
     // per-team voice buttons: draw a speaker, or next/stop when the team already has one
     const hasSpeaker = (state.speakers || []).some(sp => sp.team === t);
     const empty = state.teams[t].length === 0 ? "disabled" : "";
-    const acts = hasSpeaker
+    const profile = (state.team_profiles || {})[t] || (state.team_profiles || {}).default;
+    const acts = (hasSpeaker
       ? `<button data-cmd="next ${t}" ${state.teams[t].length < 2 ? "disabled" : ""} title="Outra pessoa deste time">⏭ Próximo</button>
          <button class="danger" data-cmd="stop ${t}" title="Tirar a voz deste time">⏹ Parar</button>`
-      : `<button data-cmd="voice ${t}" ${empty}>🎤 Sortear voz</button>`;
+      : `<button data-cmd="voice ${t}" ${empty}>🎤 Sortear voz</button>`)
+      + `<button data-cmd="testvoice ${t}" title="O goblin deste time diz uma frase fixa com a voz do time (${
+          profile ? "perfil escolhido na aba Voz" : "sem perfil: voz automática"})">🔊 Testar voz</button>`;
     if ($(".voice-acts", col).innerHTML !== acts) $(".voice-acts", col).innerHTML = acts;
     fillMembers(col, state.teams[t], "vazio");
   }
@@ -420,7 +453,7 @@ function colHtml(id, title, isTeam) {
   return `<section class="col" data-col="${id}">
     <div class="col-head">
       <div class="col-title">
-        ${isTeam ? `<iframe class="preview" src="/overlay?team=${id}&audio=0&label=0&size=64" tabindex="-1"></iframe>` : ""}
+        ${isTeam ? `<iframe class="preview" src="/overlay?team=${id}&audio=0&label=0&size=64&preview=1" tabindex="-1"></iframe>` : ""}
         <div style="flex:1;min-width:0">
           <div class="col-title"><h2>${esc(title)}</h2><span class="count">0</span></div>
           ${isTeam ? `<div class="voice-acts"></div>` : ""}
@@ -468,9 +501,32 @@ function renderSpeakers() {
 
 function renderUrls(teams) {
   const base = `${location.protocol}//${location.host}/overlay`;
-  const rows = [["Principal (com áudio)", base], ...teams.map(t => [`Só ${t} (sem áudio)`, `${base}?team=${t}&audio=0`])];
-  const html = rows.map(([label, url]) => `<div class="url"><span style="width:150px;color:var(--muted);font-size:12px">${label}</span><code>${esc(url)}</code><button class="icon" data-copy="${esc(url)}">copiar</button></div>`).join("");
+  const overlays = state.overlays || [];
+  // [label, url, pinned team (null = main)]
+  const rows = [["Principal", base, null], ...teams.map(t => [`Time ${t}`, `${base}?team=${t}`, t])];
+  const html = rows.map(([label, url, team]) => {
+    const mine = overlays.filter(o => o.team === team);
+    const status = !mine.length ? "não conectada" : mine.some(o => o.audio) ? "conectada" : "conectada, sem áudio";
+    return `<div class="url"><span class="dot ${mine.length ? "ok" : ""}" title="${status}"></span>
+      <span style="width:96px;color:${team ? teamColor(team) : "var(--muted)"};font-size:12px;text-transform:capitalize">${label}</span>
+      <code>${esc(url)}</code><button class="icon" data-copy="${esc(url)}">copiar</button></div>`;
+  }).join("") + `<p class="hint" style="margin-top:6px">Cada fonte de time mostra o goblin e toca só as falas do seu time.
+    A principal toca as falas dos times sem fonte própria. O ponto verde indica que a fonte está aberta no OBS.</p>`;
   if ($("#urls").innerHTML !== html) $("#urls").innerHTML = html;
+}
+
+// one row of png+gif slots for the shared goblin, then one per team
+let uploadsKey = null;
+function renderUploads(teams) {
+  const key = teams.join(",");
+  if (key !== uploadsKey) {
+    uploadsKey = key;
+    const row = (stem, label) => `<div class="up-row" data-row="${stem}"><b>${label}</b>
+      <label class="upload" data-file="${stem}.png"></label><label class="upload" data-file="${stem}.gif"></label></div>`;
+    $("#uploads").innerHTML = row("goblin", "Padrão") + teams.map(t => row(t, t)).join("");
+    loadAssets();
+  }
+  for (const t of teams) $(`.up-row[data-row="${t}"]`).style.setProperty("--team", teamColor(t));
 }
 
 // ---- assets ---------------------------------------------------------
@@ -478,8 +534,13 @@ async function loadAssets() {
   try { assetFiles = (await (await fetch("/api/assets")).json()).files; } catch { assetFiles = []; }
   for (const el of document.querySelectorAll(".upload")) {
     const f = el.dataset.file, has = assetFiles.includes(f);
-    const label = f.endsWith(".png") ? "parado (.png)" : "falando (.gif)";
-    el.innerHTML = `${has ? `<img src="/assets/${f}?t=${Date.now()}">` : `<div class="ph">arraste ou clique para enviar</div>`}
+    const ext = f.split(".")[1], shared = `goblin.${ext}`;
+    const label = ext === "png" ? "parado (.png)" : "falando (.gif)";
+    // an empty team slot shows what that team uses instead: the shared image, or the built-in goblin
+    const empty = f === shared ? `<div class="ph">arraste ou clique para enviar</div>`
+      : assetFiles.includes(shared) ? `<img class="fallback" src="/assets/${shared}?t=${Date.now()}" title="usando o padrão">`
+      : `<div class="ph">usa o padrão</div>`;
+    el.innerHTML = `${has ? `<img src="/assets/${f}?t=${Date.now()}">` : empty}
       <span class="label">${label}</span>
       <input type="file" accept="${f.endsWith(".png") ? "image/png" : "image/gif"}" hidden>
       ${has ? `<button class="icon danger" data-delete="${f}">remover</button>` : ""}`;
@@ -534,6 +595,7 @@ document.addEventListener("input", (e) => {
   const col = t.closest(".col");
   const color = $(".tint-color", col).value, strength = $(".tint-strength", col).value / 100;
   col.style.setProperty("--team", color);
+  $(".tint-strength", col).style.setProperty("--pct", strength * 100 + "%");
   clearTimeout(tintTimer);
   tintTimer = setTimeout(() => cmd(`tint ${t.dataset.team} ${color} ${strength}`, { quiet: true }), 120);
 });

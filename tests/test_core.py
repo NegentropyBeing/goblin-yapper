@@ -310,3 +310,95 @@ def test_multivoice_toggle_and_per_speaker_queue_limit(tmp_path):
         assert (await app.command("multivoice talvez")).startswith("erro")
 
     asyncio.run(run())
+
+
+class Sock:
+    """Stands in for a websocket: records what the server sent it."""
+
+    def __init__(self):
+        self.sent = []
+
+    async def send_str(self, data):
+        self.sent.append(json.loads(data))
+
+
+def _app_with_overlays(**overlays):
+    """overlays: name -> (pinned team | None, audio on?). Also connects a panel (no hello)."""
+    app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
+    socks = {"panel": Sock()}
+    app.clients.add(socks["panel"])
+    for name, (team, audio) in overlays.items():
+        socks[name] = Sock()
+        app.clients.add(socks[name])
+        app.overlays[socks[name]] = {"team": team, "audio": audio}
+    return app, socks
+
+
+def test_pick_player_routing():
+    app, s = _app_with_overlays(main=(None, True), azul=("azul", True), verde_muted=("verde", False))
+    assert app.pick_player("azul") is s["azul"]        # the team's own source
+    assert app.pick_player("verde") is s["main"]       # its source is muted -> main
+    assert app.pick_player("roxo") is s["main"]        # no source of its own -> main
+    assert app.pick_player(None) is s["main"]          # chatter without a team -> main
+    app.clients.discard(s["main"])                     # main closed
+    assert app.pick_player("azul") is s["azul"]
+    assert app.pick_player("verde") is None and app.pick_player(None) is None
+    assert app.state()["overlays"] == [{"team": "azul", "audio": True}, {"team": "verde", "audio": False}]
+
+
+def _run_one_line(app, team):
+    """Queue one test line, let the worker send it, acknowledge it, return when idle."""
+    async def run():
+        worker = asyncio.create_task(app.speech_worker())
+        await app.say("teste", "oi", team=team)
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            if app.speaking:
+                app.on_audio_ended(app.speaking.id)
+                break
+        await asyncio.sleep(0.05)
+        worker.cancel()
+
+    asyncio.run(run())
+
+
+def test_only_the_team_overlay_is_told_to_play():
+    app, s = _app_with_overlays(main=(None, True), azul=("azul", True), verde=("verde", True))
+    _run_one_line(app, "azul")
+    plays = {name: [m["play"] for m in sock.sent if m["type"] == "speak"] for name, sock in s.items()}
+    assert plays == {"panel": [False], "main": [False], "azul": [True], "verde": [False]}
+    # everyone still hears about the line (to animate) and its end
+    assert all(any(m["type"] == "idle" for m in sock.sent) for sock in s.values())
+    assert not any(m["type"] == "notice" for m in s["panel"].sent)
+
+
+def test_no_audio_overlay_gives_a_notice():
+    app, s = _app_with_overlays(azul=("azul", True))
+    _run_one_line(app, "verde")  # verde has no source and there is no main one
+    assert [m["play"] for m in s["azul"].sent if m["type"] == "speak"] == [False]
+    assert any(m["type"] == "notice" and "verde" in m["text"] for m in s["panel"].sent)
+
+
+def test_panel_is_the_last_resort_player():
+    app, s = _app_with_overlays(azul=("azul", True))
+    app.overlays[s["panel"]] = {"role": "panel", "team": None, "audio": True}
+    assert app.pick_player("azul") is s["azul"]    # an overlay always wins
+    assert app.pick_player("verde") is s["panel"]  # no overlay for verde, no main -> the panel plays it
+    assert app.state()["overlays"] == [{"team": "azul", "audio": True}]  # panels aren't listed as OBS sources
+    _run_one_line(app, "verde")
+    assert [m["play"] for m in s["panel"].sent if m["type"] == "speak"] == [True]
+    assert not any(m["type"] == "notice" for m in s["panel"].sent)
+
+
+def test_testvoice_uses_the_team_phrase_and_profile():
+    async def run():
+        app = App({"teams": {"count": 2}, "tts": {"test_phrase": "Oi, time {team}!"}}, TTS({"engine": "dummy"}))
+        await app.command("teamvoice verde goblin-verde-1")
+        assert (await app.command("testvoice verde")) == "testando a voz do time verde"
+        utt = app.speech_q.get_nowait()
+        assert (utt.text, utt.team, utt.chat) == ("Oi, time verde!", "verde", False)
+        assert app.tts.voice_for(utt.team)["profile"] == "goblin-verde-1"
+        assert (await app.command("testvoice roxo")).startswith("erro")  # only 2 teams active
+        assert (await app.command("testvoice")).startswith("erro")
+
+    asyncio.run(run())

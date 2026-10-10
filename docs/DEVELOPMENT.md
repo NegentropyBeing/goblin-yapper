@@ -105,6 +105,7 @@ comandos. `<time>` é `azul`, `verde`, `roxo` ou `amarelo`.
 | `teamvoice <time\|default> <perfil\|none>` | Perfil de voz com que um time fala (aba Voz) |
 | `engine <server\|sapi\|dummy>` | Troca a engine de TTS |
 | `test <time> <texto>` | Faz o goblin daquele time dizer uma frase de teste |
+| `testvoice <time>` | O goblin do time diz a frase fixa (`[tts] test_phrase`) com a voz do time (botão **Testar voz**) |
 | `state` | Mostra a fila, os times e quem está com a voz |
 
 ```
@@ -112,6 +113,13 @@ POST /api/command   {"command": "sort"}
 GET  /api/state
 WS   /ws            (envios de state / speak / idle / stop / assets)
 ```
+
+**Quem toca cada fala.** Ao conectar no `/ws`, cada overlay envia
+`{"type": "hello", "role": "overlay", "team": "azul" | null, "audio": true}` (o painel envia `role: "panel"`;
+as miniaturas do painel usam `?preview=1` e não contam). Todo cliente recebe o `speak` de cada fala, mas só
+um recebe `play: true` (`App.pick_player`): o overlay fixado no time da fala, senão o overlay principal, senão
+um painel aberto. Esse cliente toca `url` e responde `{"type": "ended", "id": n}`. `state.overlays` lista as
+fontes do OBS conectadas.
 
 ## Configuração
 
@@ -255,6 +263,7 @@ commands. `<time>` (team) is `azul`, `verde`, `roxo` or `amarelo`.
 | `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |
 | `engine <server\|sapi\|dummy>` | Switch the TTS engine |
 | `test <time> <texto>` | Make that team's goblin say a test line |
+| `testvoice <time>` | The team's goblin says the fixed phrase (`[tts] test_phrase`) in the team's voice (**Testar voz** button) |
 | `state` | Print queue, teams and who has the voice |
 
 ```
@@ -262,6 +271,13 @@ POST /api/command   {"command": "sort"}
 GET  /api/state
 WS   /ws            (state / speak / idle / stop / assets pushes)
 ```
+
+**Who plays each line.** On connecting to `/ws`, each overlay sends
+`{"type": "hello", "role": "overlay", "team": "azul" | null, "audio": true}` (the panel sends `role: "panel"`;
+the panel's thumbnails use `?preview=1` and don't count). Every client gets the `speak` for each line, but only
+one gets `play: true` (`App.pick_player`): the overlay pinned to the line's team, else the main overlay, else
+an open panel. That client plays `url` and answers `{"type": "ended", "id": n}`. `state.overlays` lists the
+connected OBS sources.
 
 ## Configuration
 

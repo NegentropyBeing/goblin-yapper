@@ -5,8 +5,10 @@
 <title>Goblin Yapper Overlay</title>
 <!--
   OBS browser source. Query params:
-    ?team=azul   always show this team's goblin (animates only when that team speaks)
-    ?audio=0     don't play audio here (use on extra per-team sources, keep one with audio)
+    ?team=azul   always show this team's goblin; it animates and plays audio only for that team's lines
+    ?audio=0     never play audio here
+  Without ?team it is the main source: shows whoever is speaking and plays the lines of teams that
+  have no source of their own. The server picks exactly one source to play each line.
     ?label=0     hide the speaker name
     ?size=400    goblin size in px
 -->
@@ -120,7 +122,9 @@ function stopTalking(id) {
 function onSpeak(msg) {
   currentId = msg.id; talkingTeam = msg.team; talkingUser = msg.user;
   render();
-  if (!PLAY_AUDIO) return;
+  // The server picks one overlay per line (msg.play): this team's own source if it has audio,
+  // otherwise the main one. Every overlay still gets the line, to animate its goblin if it's the speaker's.
+  if (!PLAY_AUDIO || !msg.play) return;
   audio.src = msg.url;
   audio.onended = () => { send({ type: "ended", id: msg.id }); stopTalking(msg.id); };
   audio.onerror = audio.onended;
@@ -131,6 +135,8 @@ function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
 function connect() {
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  // ?preview=1 (the panel's thumbnails) doesn't count as an OBS source
+  ws.onopen = () => send({ type: "hello", role: params.has("preview") ? "preview" : "overlay", team: PIN_TEAM, audio: PLAY_AUDIO });
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "state") { state = msg; render(); }

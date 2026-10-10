@@ -37,8 +37,9 @@ Requisitos:
    um nick (aquela pessoa). **⏭ Próximo** passa a voz para outra pessoa do mesmo time e **⏹ Parar** tira a voz
    do time; **Parar voz**, no topo, corta tudo.
    Com **vários times ao mesmo tempo** ligado, cada time pode ter alguém com a voz; as falas tocam uma de cada vez.
-4. **Coloque no OBS**: abra **Overlay do OBS e imagens do goblin**, copie a URL do overlay e adicione uma
-   **Fonte de navegador** no OBS com ela.
+   **🔊 Testar voz**, em cada time, faz o goblin do time dizer uma frase fixa com a voz daquele time.
+4. **Coloque no OBS**: abra **Overlay do OBS e imagens do goblin**, copie a URL de cada time e adicione uma
+   **Fonte de navegador** no OBS para cada uma.
 5. **Configure a voz** (aba **Voz**): na primeira vez, clique em **Instalar servidor de voz**. Ele baixa tudo
    o que precisa (~3,5 GB, mais ~3 GB do modelo ao iniciar pela primeira vez); não é preciso instalar Python.
    Depois, crie perfis de voz e escolha qual perfil cada time usa.
@@ -55,18 +56,26 @@ emotes não são lidos, e no máximo 5 mensagens ficam esperando; o resto é des
 
 ### OBS
 
-- URL do overlay: `http://127.0.0.1:8765/overlay` (fundo transparente). O app precisa estar aberto.
-- Um goblin por fonte: `?team=azul&audio=0`, uma fonte por time; deixe só **uma** fonte com o áudio ligado.
-- Outras opções: `?size=400` (tamanho), `?label=0` (esconde o nick).
-- Ative "Controlar áudio pelo OBS" na fonte para ter a voz num canal próprio do mixer.
+- **Uma fonte por time**: `http://127.0.0.1:8765/overlay?team=azul` (fundo transparente; o app precisa estar
+  aberto). Cada fonte mostra o goblin do seu time, que só se mexe e só toca som nas falas **daquele time**.
+- **Fonte principal** (opcional): `http://127.0.0.1:8765/overlay` mostra quem estiver falando e toca as falas
+  dos times que não têm fonte própria e de quem está sem time.
+- Cada fala toca em uma única fonte, então não há som duplicado. No painel, um ponto verde ao lado de cada URL
+  indica que a fonte está aberta no OBS. Sem nenhuma fonte aberta, o próprio app toca a fala (bom para testar).
+- Ative "Controlar áudio pelo OBS" em cada fonte para ter cada time num canal próprio do mixer.
+- Outras opções: `?size=400` (tamanho), `?label=0` (esconde o nick), `?audio=0` (fonte sem som).
 - O painel também funciona como dock personalizado do OBS: `http://127.0.0.1:8765/panel`.
 
 ### Imagens do goblin
 
-Na seção **Overlay do OBS e imagens do goblin**, arraste um `goblin.png` (parado) e um `goblin.gif` (falando).
-Cada time recebe o mesmo goblin tingido com a sua cor; ajuste a cor e a intensidade da tinta em cada time.
-Um goblin neutro ou acinzentado fica melhor tingido. Imagens próprias de um time (`azul.png` / `azul.gif`)
-substituem as compartilhadas. Sem imagens, é usado o goblin embutido.
+Na seção **Overlay do OBS e imagens do goblin** há uma linha **Padrão** e uma linha por time, cada uma com um
+espaço para o png (parado) e outro para o gif (falando): arraste as imagens ou clique para escolher.
+
+- **Padrão**: vale para todos os times que não têm imagem própria. Cada time recebe esse goblin tingido com a
+  sua cor; um goblin neutro ou acinzentado fica melhor tingido.
+- **Por time**: um par png + gif só daquele time. A tinta do time continua sendo aplicada por cima: para mostrar
+  a arte como ela é, leve a barra de tinta daquele time até o zero.
+- Sem imagens, é usado o goblin embutido.
 
 ### Perfis de voz
 
@@ -140,9 +149,10 @@ Requirements:
    name (that person). **⏭ Próximo** passes the voice to someone else on the same team and **⏹ Parar** takes it
    from the team; **Parar voz**, at the top, stops everything.
    With **vários times ao mesmo tempo** (several teams at once) on, each team can have a speaker; lines play one
-   at a time.
-4. **Add it to OBS**: open **Overlay do OBS e imagens do goblin**, copy the overlay URL and add a
-   **Browser Source** in OBS with it.
+   at a time. **🔊 Testar voz** (test voice), on each team, makes that team's goblin say a fixed phrase in the
+   team's voice.
+4. **Add it to OBS**: open **Overlay do OBS e imagens do goblin**, copy each team's URL and add a
+   **Browser Source** in OBS for each one.
 5. **Set up the voice** (**Voz** tab): the first time, click **Instalar servidor de voz** (install voice server).
    It downloads everything it needs (~3.5 GB, plus ~3 GB for the model on first start); no Python install
    needed. Then create voice profiles and choose which profile each team uses.
@@ -159,18 +169,26 @@ and emotes are skipped, and at most 5 messages wait in line; the rest are droppe
 
 ### OBS
 
-- Overlay URL: `http://127.0.0.1:8765/overlay` (transparent background). The app must be open.
-- One goblin per source: `?team=azul&audio=0`, one source per team; keep audio on in only **one** source.
-- Other options: `?size=400` (size), `?label=0` (hide the name).
-- Enable "Control audio via OBS" on the source to put the voice on its own mixer channel.
+- **One source per team**: `http://127.0.0.1:8765/overlay?team=azul` (transparent background; the app must be
+  open). Each source shows its team's goblin, which only moves and only plays sound for **that team's** lines.
+- **Main source** (optional): `http://127.0.0.1:8765/overlay` shows whoever is speaking and plays the lines of
+  teams that have no source of their own, and of people without a team.
+- Each line plays in exactly one source, so sound is never doubled. In the panel, a green dot next to each URL
+  means that source is open in OBS. With no source open, the app itself plays the line (handy for testing).
+- Enable "Control audio via OBS" on each source to put each team on its own mixer channel.
+- Other options: `?size=400` (size), `?label=0` (hide the name), `?audio=0` (silent source).
 - The panel also works as an OBS custom dock: `http://127.0.0.1:8765/panel`.
 
 ### Goblin images
 
-In **Overlay do OBS e imagens do goblin**, drop a `goblin.png` (idle) and a `goblin.gif` (talking). Each team
-gets the same goblin tinted with its color; set each team's tint color and strength. A neutral or grayish goblin
-tints best. A team's own images (`azul.png` / `azul.gif`) override the shared ones. Without images, the built-in
-goblin is used.
+**Overlay do OBS e imagens do goblin** has a **Padrão** (default) row and one row per team, each with a slot for
+the png (idle) and one for the gif (talking): drop the images in or click to choose.
+
+- **Padrão**: used by every team without images of its own. Each team gets this goblin tinted with its color; a
+  neutral or grayish goblin tints best.
+- **Per team**: a png + gif pair just for that team. The team's tint is still applied on top: to show the art as
+  drawn, slide that team's tint bar down to zero.
+- Without images, the built-in goblin is used.
 
 ### Voice profiles
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Per-team goblin images**: the panel now has a png + gif slot pair for each team, next to the shared
+  default pair. A team without its own images keeps using the default.
+- **Per-team overlay audio**: each team's OBS source plays only that team's lines, so every team can have its
+  own mixer channel. The main source plays lines of teams without a source. Each line plays in exactly one
+  source (no doubled audio); with no source open, the app itself plays it.
+- **Testar voz** button on each team: the team's goblin says a fixed phrase (`[tts] test_phrase`) through the
+  full voice pipeline, with that team's voice profile.
+- The panel shows which OBS sources are connected; the tint slider is thinner.
+- Team source URLs no longer need `&audio=0`. Existing sources that have it stay silent, as before.
+
 ## v0.1.0 — first release
 
 Windows installer: `Goblin Yapper_0.1.0_x64_pt-BR.msi`.
