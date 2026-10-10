@@ -164,8 +164,11 @@ def make_app(srv: TTSServer) -> web.Application:
     @routes.get("/status")
     async def status(_):
         info = srv.engine.info() if srv.state == "ready" else {}
+        # profiles_dir: the server reports its own folder, so the panel shows the truth even when
+        # it is attached to a server started elsewhere (with another data dir)
         return web.json_response({"state": srv.state, "error": srv.error, "busy": srv.busy,
-                                  "engine": srv.engine.name, "label": srv.engine.label, **info})
+                                  "engine": srv.engine.name, "label": srv.engine.label,
+                                  "profiles_dir": str(srv.profiles_dir), **info})
 
     @routes.get("/schema")
     async def schema(_):
@@ -275,7 +278,10 @@ def make_app(srv: TTSServer) -> web.Application:
 
     @routes.delete("/profiles/{id}")
     async def delete_profile(request):
-        shutil.rmtree(srv.profile_dir(request.match_info["id"]))
+        pid = request.match_info["id"]
+        name = srv.read_profile(pid).get("name", "?")
+        shutil.rmtree(srv.profile_dir(pid))
+        log.info("perfil apagado: %s (%s)", name, pid)  # deletions are permanent, so leave a trace
         return web.json_response({"ok": True})
 
     @routes.post("/synthesize")

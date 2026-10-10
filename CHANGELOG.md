@@ -11,6 +11,9 @@
   full voice pipeline, with that team's voice profile.
 - The panel shows which OBS sources are connected; the tint slider is thinner.
 - Team source URLs no longer need `&audio=0`. Existing sources that have it stay silent, as before.
+- Deleting a voice profile is now recorded in `tts\tts-server.log` (time, name and id).
+- The Voz tab shows the folder the profiles are saved in ("Perfis salvos em: …"), as reported by the voice
+  server itself, so it is clear which data folder's profiles are listed.
 
 ## v0.1.0 — first release
 

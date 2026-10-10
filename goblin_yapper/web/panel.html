@@ -289,6 +289,7 @@
 
       <h2 style="margin-top:18px">Perfis</h2>
       <ul class="vz-profiles" id="vzProfiles" data-empty="nenhum perfil ainda — crie um acima"></ul>
+      <p class="hint" id="vzProfilesDir" title="Cada pasta de dados tem os seus próprios perfis"></p>
     </section>
 
     <!-- parameters -->
@@ -703,6 +704,7 @@ function renderVzStatus() {
             st.mode === "external" ? "iniciado fora do app" : ""].filter(Boolean).join(" · ");
   } else if (sv.state === "error") { dot = "bad"; text = "erro ao carregar o modelo"; banner = `${esc(sv.error)}<br>Log: <code>${esc(st.log)}</code>`; }
   else { dot = "warn"; text = "carregando modelo de voz… (a primeira vez baixa ~3 GB)"; }
+  $("#vzProfilesDir").textContent = sv.profiles_dir ? `Perfis salvos em: ${sv.profiles_dir}` : "";
   $("#vzDot").className = "dot " + dot;
   $("#vzStatusText").textContent = text;
   $("#vzBanner").hidden = !banner;
