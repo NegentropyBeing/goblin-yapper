@@ -17,3 +17,6 @@ tts_server/.venv/
 /assets/
 /tts/
 /voices/
+
+# logo candidates should not be commited 
+/docs/logo-candidates
