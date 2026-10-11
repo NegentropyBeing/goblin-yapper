@@ -8,9 +8,9 @@
   html, body { margin: 0; height: 100%; background: #12141a; color: #e7e9ef; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
   body { display: grid; place-items: center; }
   .box { text-align: center; max-width: 520px; padding: 24px; }
-  svg { width: 200px; height: 110px; animation: bob .5s infinite alternate ease-in-out; }
+  .box > svg { width: 200px; height: 110px; animation: bob .5s infinite alternate ease-in-out; }
   @keyframes bob { to { transform: translateY(-6px) rotate(2deg); } }
-  h1 { font-size: 20px; margin: 12px 0 4px; } h1 span { color: #7fbf3f; }
+  h1 { margin: 14px 0 8px; line-height: 0; } h1 .logo { height: 40px; width: auto; }
   p { color: #8b91a5; margin: 0; }
   .err { color: #fca5a5; margin-top: 14px; white-space: pre-wrap; word-break: break-word; }
 </style>
@@ -33,7 +33,13 @@
     <path class="mouth-closed" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" d="M577 775 C595 764 615 762 640 762 C660 762 672 768 686 775"/>
   </g>
 </svg>
-  <h1>Goblin <span>Yapper</span></h1>
+  <h1>
+    <svg class="logo" viewBox="0 0 660 92" role="img" aria-label="Goblin Yapper">
+    <path fill="#7fbf3f" transform="translate(3.62 84) scale(0.3867)" d="M135-27.9L150.6-76.8L81.3-96.3L73.2-69L119.4-57.3L36.9-26.4C44.1-99.9 70.2-161.1 134.1-180.6L114-112.2L147.9-103.2L174-179.7C161.1-192 141-202.8 122.4-210C40.8-195.6-2.7-108.3-4.2-15L47.1 6.3M160.2-14.1L218.4 6C261.9-2.4 295.8-54.3 294.3-121.8L234.9-145.8C190.5-137.4 156.6-82.2 160.2-14.1M212.7-20.1L196.5-26.4C199.8-58.5 216-95.1 239.1-117.9L255.9-110.4C251.1-76.2 235.5-41.7 212.7-20.1M373.2 6C420 1.2 462.3-68.1 462.6-125.7L410.7-145.8L352.5-62.4L405.9-196.5L369.6-210L291-10.5L325.2 6L337.2-24.6M351.9-36.9L413.1-116.7L424.2-111.9C414.3-74.1 389.7-41.7 364.5-27.3M454.5-10.5L488.7 6L569.4-196.5L533.1-210M631.8-199.5L598.5-205.8C593.1-191.7 591-177.3 591.9-162.6L623.1-156.6M566.4 6L619.5-131.7L583.8-145.5L528.6-10.5M731.7 6L771.6-120.6L740.1-145.8C720.6-131.7 696.6-105 675-76.5L694.8-128.7L660-142.5L605.7-10.5L643.8 6L658.2-32.1L719.7-104.7L727.5-98.1C708.6-66.3 696.3-34.5 692.4-10.5"/>
+    <path fill="#e7e9ef" d="M368 6 H634 Q656 6 656 28 V64 Q656 86 634 86 H368 Q346 86 346 64 V60 L320 50 L346 36 V28 Q346 6 368 6 Z"/>
+    <g transform="translate(369.05 25.70) scale(0.29)" fill="none" stroke="#12141a" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"><path transform="translate(0 0)" d="M0 0 V40 Q0 72 32 72 H88 Q120 72 120 40 V0 M60 72 V140"/><path transform="translate(158 0)" d="M6 0 H88 Q120 0 120 32 V140 H32 Q0 140 0 108 V102 Q0 70 32 70 H120"/><path transform="translate(316 0)" d="M0 140 V0 H88 Q120 0 120 32 V52 Q120 84 88 84 H0"/><path transform="translate(474 0)" d="M0 140 V0 H88 Q120 0 120 32 V52 Q120 84 88 84 H0"/><path transform="translate(632 0)" d="M0 70 H120 V32 Q120 0 88 0 H32 Q0 0 0 32 V108 Q0 140 32 140 H114"/><path transform="translate(790 0)" d="M0 140 V0 H88 Q120 0 120 32 V48 Q120 80 88 80 H0 M70 80 H88 Q120 80 120 112 V140"/></g>
+    </svg>
+  </h1>
   <p id="status">iniciando o servidor…</p>
   <p class="err" id="err"></p>
 </div>
