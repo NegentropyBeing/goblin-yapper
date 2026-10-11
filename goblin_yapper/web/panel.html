@@ -251,6 +251,7 @@
         <option value="dummy">teste (bipes)</option>
       </select>
     </label>
+    <button id="vzPower" disabled>Desligar modelo</button>
     <button id="vzRestart">Reiniciar servidor</button>
   </section>
   <div id="vzBanner" hidden></div>
@@ -697,7 +698,8 @@ function renderVzStatus() {
     banner = "O ambiente do servidor de voz (PyTorch + OmniVoice) não foi encontrado.<br>Instale com <code>tts_server\\setup.ps1</code> e depois clique em Reiniciar servidor.";
   } else if (st.mode === "exited") { dot = "bad"; text = "o servidor de voz parou"; banner = `Veja o log: <code>${esc(st.log)}</code>`; }
   else if (st.mode === "offline") { dot = "bad"; text = "sem conexão com o app"; }
-  else if (st.mode === "stopped" || st.mode === "disabled") { text = "servidor de voz parado"; }
+  else if (st.mode === "stopped") { text = "modelo de voz desligado · VRAM liberada"; }
+  else if (st.mode === "disabled") { text = "servidor de voz parado"; }
   else if (sv.state === "ready") {
     dot = "ok";
     text = [sv.label, "pronto", sv.gpu, sv.vram_used_gb != null ? `VRAM ${sv.vram_used_gb}/${sv.vram_total_gb} GB` : "",
@@ -711,6 +713,11 @@ function renderVzStatus() {
   $("#vzBanner").hidden = !banner;
   if ($("#vzBanner").innerHTML !== banner) $("#vzBanner").innerHTML = banner;
   $("#vzRestart").disabled = st.mode === "external";
+  // on/off is for the server the app itself runs; "exited" (it crashed) can be turned on again
+  const off = st.mode === "stopped" || st.mode === "exited";
+  $("#vzPower").textContent = off ? "Ligar modelo" : "Desligar modelo";
+  $("#vzPower").dataset.action = off ? "start" : "stop";
+  $("#vzPower").disabled = !off && st.mode !== "managed";
   $("#vzDrop").classList.toggle("disabled", sv.state !== "ready");
   $("#vzSpeak").disabled = sv.state !== "ready";
 }
@@ -1010,6 +1017,13 @@ $("#vzRestart").addEventListener("click", async () => {
   if (!confirm("Reiniciar o servidor de voz? O modelo será recarregado.")) return;
   try { vz.status = await api("/api/tts-service/restart", { method: "POST" }); vz.loaded = false; renderVzStatus(); toast("servidor de voz reiniciando"); }
   catch (e) { toast(e.message, true); }
+});
+$("#vzPower").addEventListener("click", async (e) => {
+  const action = e.target.dataset.action;
+  if (action === "stop" && !confirm("Desligar o modelo de voz? A VRAM é liberada; os goblins ficam sem a voz do OmniVoice até você ligar de novo.")) return;
+  e.target.disabled = true;
+  try { vz.status = await api(`/api/tts-service/${action}`, { method: "POST" }); vz.loaded = false; renderVzStatus(); toast(action === "stop" ? "modelo de voz desligado" : "ligando o modelo de voz"); }
+  catch (err) { toast(err.message, true); renderVzStatus(); }
 });
 $("#vzEngine").addEventListener("change", (e) => cmd(`engine ${e.target.value}`));
 $("#vzTeams").addEventListener("change", (e) => {

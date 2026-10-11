@@ -64,6 +64,8 @@ class TTSService:
 
     async def start(self) -> None:
         self.session = self.session or aiohttp.ClientSession()
+        if self.proc and self.proc.returncode is None:
+            return  # already on
         if await self._alive():
             self.mode = "external"
             log.info("servidor TTS já rodando em %s; usando ele", self.url)
@@ -103,6 +105,13 @@ class TTSService:
             raise RuntimeError("o servidor TTS foi iniciado fora do app; reinicie-o por lá")
         await self.stop()
         await self.start()
+
+    async def turn_off(self) -> None:
+        """Unload the model: ending the server process is what gives all its VRAM back."""
+        if self.mode == "external":
+            raise RuntimeError("o servidor TTS foi iniciado fora do app; desligue-o por lá")
+        await self.stop()
+        log.info("servidor TTS desligado pelo painel")
 
     async def close(self) -> None:
         await self.stop()

@@ -13,6 +13,8 @@
                                "speak" carries play=true for the one overlay that should play the audio.
   GET    /api/tts-service      TTS server process status (+ the server's own /status)
   POST   /api/tts-service/restart
+  POST   /api/tts-service/stop     turn the voice model off (ends the TTS server process, freeing its VRAM)
+  POST   /api/tts-service/start    turn it back on
   POST   /api/tts-service/install  first-run install of the voice runtime (installed app)
   *      /api/tts/<path>       forwarded to the TTS server (profiles, pipeline, schema, settings, synthesize)
 """
@@ -145,6 +147,17 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
             raise web.HTTPConflict(text=str(e))
         return web.json_response(await app.tts_service.status())
 
+    async def tts_service_stop(_):
+        try:
+            await app.tts_service.turn_off()
+        except RuntimeError as e:
+            raise web.HTTPConflict(text=str(e))
+        return web.json_response(await app.tts_service.status())
+
+    async def tts_service_start(_):
+        await app.tts_service.start()
+        return web.json_response(await app.tts_service.status())
+
     async def tts_service_install(_):
         try:
             app.tts_service.install()
@@ -181,6 +194,8 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         web.get("/ws", ws_handler),
         web.get("/api/tts-service", tts_service_status),
         web.post("/api/tts-service/restart", tts_service_restart),
+        web.post("/api/tts-service/stop", tts_service_stop),
+        web.post("/api/tts-service/start", tts_service_start),
         web.post("/api/tts-service/install", tts_service_install),
         web.route("*", "/api/tts/{tail:.*}", tts_proxy),
         web.static("/assets", assets_dir),
