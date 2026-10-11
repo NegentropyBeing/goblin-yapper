@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/goburin.png" alt="Goburin, the Goblin Yapper goblin" width="280"></p>
+<p align="center"><img src="docs/banner.png" alt="Goblin Yapper banner with Goburin, the Goblin Yapper goblin" width="720"></p>
 
 # Goblin Yapper
 
