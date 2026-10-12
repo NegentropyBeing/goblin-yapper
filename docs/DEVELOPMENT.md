@@ -100,6 +100,9 @@ comandos. `<time>` é `azul`, `verde`, `roxo` ou `amarelo`.
 | `give <user>` | Dá a voz a uma pessoa específica (ela não precisa estar em um time) |
 | `stop [time\|user]` | Tira a voz e corta o áudio (sem argumento: de todos) |
 | `multivoice <on\|off>` | Uma pessoa com a voz por time ao mesmo tempo; as falas continuam tocando uma de cada vez |
+| `skip` | Pula a fala em andamento (travada na geração ou tocando); a fila de falas continua |
+| `autoremove <on\|off> [min]` | Tira da fila e dos times quem ficar `min` minutos sem escrever no chat (só conta com o chat conectado) |
+| `autorotate <on\|off> [min]` | Passa a voz para outra pessoa do mesmo time a cada `min` minutos, depois que a fala atual termina |
 | `channel <canal\|off>` | Conecta ao chat de um canal (nome ou link colado) ou desconecta |
 | `tint <time> <#rrggbb\|off> [0-1]` | Cor e intensidade da tinta do goblin do time |
 | `teamvoice <time\|default> <perfil\|none>` | Perfil de voz com que um time fala (aba Voz) |
@@ -258,6 +261,9 @@ commands. `<time>` (team) is `azul`, `verde`, `roxo` or `amarelo`.
 | `give <user>` | Give the voice to a specific person (they don't need to be on a team) |
 | `stop [time\|user]` | Take the voice away and cut their audio (no argument: everyone) |
 | `multivoice <on\|off>` | One speaker per team at the same time; lines still play one at a time |
+| `skip` | Drop the line in progress (stuck in generation or playing); the speech queue goes on |
+| `autoremove <on\|off> [min]` | Remove from the queue and teams whoever writes nothing in chat for `min` minutes (only counts while the chat is connected) |
+| `autorotate <on\|off> [min]` | Pass the voice to another chatter of the same team every `min` minutes, once the current line ends |
 | `channel <canal\|off>` | Connect to a channel's chat (name or pasted link), or disconnect |
 | `tint <time> <#rrggbb\|off> [0-1]` | Team goblin tint color and strength |
 | `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |

@@ -8,6 +8,8 @@ count = 4                    # 1..4: azul, verde, roxo, amarelo
 auto_assign_late = true      # quem entra depois do sorteio vai direto pro menor time
 queue_open_on_start = false
 tint_strength = 0.55         # força padrão da tinta: 0 = sem tinta, 1 = cor total
+inactive_remove = false      # tirar da fila e dos times quem ficar sem falar no chat (também no painel)
+inactive_minutes = 10
 
 # Tinta aplicada sobre assets/goblin.png + goblin.gif para cada time.
 # Também dá pra mudar ao vivo: tint azul #1e40ff 0.7  |  tint azul off
@@ -26,6 +28,11 @@ strength = 0.55
 [teams.tint.amarelo]
 color = "#facc15"
 strength = 0.55
+
+[voice]
+multi = false                # um falante por time ao mesmo tempo
+rotate = false               # passar a voz para outra pessoa do time sozinho (também no painel)
+rotate_minutes = 5
 
 [server]
 host = "127.0.0.1"

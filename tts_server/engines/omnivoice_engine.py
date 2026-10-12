@@ -43,8 +43,10 @@ class OmniVoiceEngine(Engine):
         out = {"device": str(self.model.device), "asr_loaded": getattr(self.model, "_asr_pipe", None) is not None}
         if self.torch.cuda.is_available():
             free, total = self.torch.cuda.mem_get_info()
+            # vram_used_gb is the whole card (games, browser, OBS...); vram_model_gb is this process alone
             out.update(gpu=self.torch.cuda.get_device_name(0), vram_used_gb=round((total - free) / 2**30, 2),
-                       vram_total_gb=round(total / 2**30, 2))
+                       vram_total_gb=round(total / 2**30, 2),
+                       vram_model_gb=round(self.torch.cuda.memory_reserved() / 2**30, 2))
         return out
 
     def _language_options(self) -> list[dict]:
@@ -98,19 +100,35 @@ class OmniVoiceEngine(Engine):
         import soundfile as sf
 
         samples, sr = sf.read(str(wav), dtype="float32", always_2d=True)
-        return self.model.transcribe((samples.mean(axis=1), sr)).strip()
+        try:
+            return self.model.transcribe((samples.mean(axis=1), sr)).strip()
+        finally:
+            self._trim()
 
     def release_asr(self) -> None:
         if getattr(self.model, "_asr_pipe", None) is not None:
             self.model._asr_pipe = None
             gc.collect()
-            self.torch.cuda.empty_cache()
+            self._trim()
             log.info("Whisper descarregado (VRAM liberada)")
+
+    def _trim(self) -> None:
+        """Give PyTorch's cached blocks back to the GPU: the work memory of a job would otherwise stay
+        reserved by this process (seen: 0.7 to 5 GB) for as long as the server runs. Costs no time."""
+        if self.torch.cuda.is_available():
+            self.torch.cuda.empty_cache()
 
     def build_profile(self, wav: Path, ref_text: str, cache: Path) -> None:
         # preprocess_prompt also ends the transcript with punctuation; re-trimming an already
         # trimmed clip is harmless.
-        prompt = self.model.create_voice_clone_prompt(ref_audio=str(wav), ref_text=ref_text, preprocess_prompt=True)
+        # inference_mode: omnivoice runs this one with autograd on, which keeps every activation of
+        # the audio tokenizer alive (3 GB of VRAM for a 10 s clip, 6 GB for 20 s) for the same tokens.
+        try:
+            with self.torch.inference_mode():
+                prompt = self.model.create_voice_clone_prompt(ref_audio=str(wav), ref_text=ref_text,
+                                                              preprocess_prompt=True)
+        finally:
+            self._trim()
         prompt.save(str(cache))
 
     def _prompt(self, cache: Path):
@@ -132,11 +150,14 @@ class OmniVoiceEngine(Engine):
             kwargs["voice_clone_prompt"] = self._prompt(cache)
         elif params.get("instruct"):
             kwargs["instruct"] = params["instruct"]
-        audio = self.model.generate(
-            text=text,
-            language=None if language in (None, "", "auto") else language,
-            speed=None if speed in (None, 1.0) else speed,
-            normalize_text=bool(params.get("normalize_text", False)),
-            **kwargs,
-        )
+        try:
+            audio = self.model.generate(
+                text=text,
+                language=None if language in (None, "", "auto") else language,
+                speed=None if speed in (None, 1.0) else speed,
+                normalize_text=bool(params.get("normalize_text", False)),
+                **kwargs,
+            )
+        finally:
+            self._trim()
         return np.asarray(audio[0], dtype=np.float32)

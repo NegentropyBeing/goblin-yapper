@@ -402,3 +402,205 @@ def test_testvoice_uses_the_team_phrase_and_profile():
         assert (await app.command("testvoice")).startswith("erro")
 
     asyncio.run(run())
+
+
+def _game(cfg=None, people=("ana", "bia", "caio", "duda")):
+    """App with a fake clock (app.clock[0], in seconds), a connected chat and an open queue."""
+    app = App({"teams": {"count": 2}, **(cfg or {})}, TTS({"engine": "dummy"}))
+    app.clock = [0.0]
+    app.now = lambda: app.clock[0]
+    app.chat_status = "conectado"
+    app.sorter.queue_open = True
+    return app, people
+
+
+def test_inactive_chatters_are_removed_after_the_limit(tmp_path):
+    async def run():
+        app, people = _game()
+        app.settings_path = tmp_path / "settings.json"
+        for name in people:
+            await app.on_chat(ChatMessage(name, name.title(), "!joinsort", {}))
+        await app.tick()
+        app.clock[0] = 9 * 60
+        await app.on_chat(ChatMessage("ana", "Ana", "ainda estou aqui", {}))
+        app.clock[0] = 11 * 60
+        await app.tick()
+        assert len(app.sorter.queue) == 4  # off by default
+        assert (await app.command("autoremove on 10")) == "inativos saem após 10 min sem falar no chat"
+        assert app.state()["auto_remove"] == {"on": True, "minutes": 10.0}
+        saved = json.loads(app.settings_path.read_text(encoding="utf-8"))["teams"]
+        assert saved == {"inactive_remove": True, "inactive_minutes": 10.0}
+        app.chat_status = "reconectando"
+        await app.tick()
+        assert len(app.sorter.queue) == 4  # the chat is down: nobody can be heard, nobody is removed
+        app.chat_status = "conectado"
+        await app.tick()
+        assert app.sorter.queue == ["ana"]  # only the one who wrote in the last 10 minutes stays
+        assert (await app.command("autoremove on zero")).startswith("erro")
+        assert (await app.command("autoremove")).startswith("erro")
+        assert (await app.command("autoremove off")) == "remoção de inativos desligada"
+        app.clock[0] = 60 * 60
+        await app.tick()
+        assert app.sorter.queue == ["ana"]
+
+    asyncio.run(run())
+
+
+def test_reconnecting_restarts_the_inactivity_clocks():
+    async def run():
+        app, _ = _game({"teams": {"count": 2, "inactive_remove": True, "inactive_minutes": 5}})
+        await app.command("add ana")
+        await app.tick()
+        app.clock[0] = 20 * 60
+        app.last_seen.clear()  # what _set_chat_status("conectado") does
+        await app.tick()
+        assert app.sorter.queue == ["ana"]
+        app.clock[0] = 26 * 60
+        await app.tick()
+        assert app.sorter.queue == []
+
+    asyncio.run(run())
+
+
+def test_voice_rotates_inside_the_team_after_the_limit():
+    async def run():
+        app, people = _game()
+        for name in people:
+            await app.command(f"add {name}")
+        await app.command("sort")
+        await app.command("voice azul")
+        first = app.voice.active
+        await app.tick()
+        app.clock[0] = 6 * 60
+        await app.tick()
+        assert app.voice.active == first  # off by default
+        assert (await app.command("autorotate on 5")) == "a voz troca de pessoa a cada 5 min"
+        app.speaking = type("U", (), {"user": first, "id": 1, "team": "azul"})()  # their line is playing: wait
+        await app.tick()
+        assert app.voice.active == first
+        app.speaking = None
+        await app.tick()
+        second = app.voice.active
+        assert second != first and app.voice.active_team == "azul"
+        app.clock[0] = 10 * 60
+        await app.tick()
+        assert app.voice.active == second  # the new speaker's own 5 minutes started at the hand-over
+        app.clock[0] = 11 * 60 + 1
+        await app.tick()
+        assert app.voice.active == first
+
+    asyncio.run(run())
+
+
+def test_rotation_in_multi_mode_and_idle_speaker_is_replaced():
+    async def run():
+        app, people = _game({"voice": {"multi": True, "rotate": True, "rotate_minutes": 5},
+                             "teams": {"count": 2, "inactive_remove": True, "inactive_minutes": 3}})
+        for name in people:
+            await app.command(f"add {name}")
+        await app.command("sort")
+        await app.command("voice azul")
+        await app.command("voice verde")
+        azul, verde = app.voice.speaker_of("azul"), app.voice.speaker_of("verde")
+        await app.tick()
+        app.clock[0] = 4 * 60
+        for name in people:
+            if name != azul:  # everyone but azul's speaker keeps chatting
+                await app.on_chat(ChatMessage(name, name, "oi", {}))
+        await app.tick()
+        # azul's speaker went silent: out of the game, and the voice went to their teammate
+        assert app.sorter.where(azul) is None
+        assert app.voice.speaker_of("azul") not in (None, azul)
+        assert app.voice.speaker_of("verde") == verde
+        app.clock[0] = 5 * 60 + 1
+        for name in people:
+            await app.on_chat(ChatMessage(name, name, "oi", {}))
+        await app.tick()
+        assert app.voice.speaker_of("verde") != verde  # verde's 5 minutes are over
+        assert len(app.voice.users) == 2
+
+    asyncio.run(run())
+
+
+class _StuckEngine:
+    """First call hangs until released; later calls answer at once."""
+    name = "stuck"
+
+    def __init__(self, reentrant):
+        import threading
+
+        self.reentrant = reentrant
+        self.release = threading.Event()
+        self.calls = []
+
+    def synthesize(self, text, voice):
+        from goblin_yapper.tts import DummyEngine
+
+        self.calls.append(text)
+        if len(self.calls) == 1:
+            self.release.wait(10)
+        return DummyEngine({}).synthesize(text, voice)
+
+
+async def _until(cond, timeout=5.0):
+    for _ in range(int(timeout / 0.01)):
+        if cond():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("timeout")
+
+
+@pytest.mark.parametrize("reentrant", [True, False])
+def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant):
+    class FakeWS:
+        def __init__(self):
+            self.sent = []
+
+        async def send_str(self, data):
+            self.sent.append(json.loads(data))
+
+    async def run():
+        app = App({}, TTS({"engine": "dummy"}))
+        engine = app.tts.engine = _StuckEngine(reentrant)
+        ws = FakeWS()
+        app.clients.add(ws)
+        worker = asyncio.create_task(app.speech_worker())
+        assert (await app.command("skip")).startswith("erro")  # nothing in progress
+        await app.say("ana", "travada")
+        await app.say("bia", "segunda")
+        await _until(lambda: app.generating is not None and engine.calls)
+        assert app.state()["generating"] == {"user": "ana", "team": None}
+        assert "pulada" in await app.command("skip")
+        spoken = lambda: [m["text"] for m in ws.sent if m["type"] == "speak"]  # noqa: E731
+        if reentrant:
+            await _until(lambda: spoken() == ["segunda"])  # went on although the first call is still hanging
+            assert not engine.release.is_set()
+        else:
+            await asyncio.sleep(0.2)
+            assert spoken() == [] and engine.calls == ["travada"]  # this engine can't take a second call yet
+            engine.release.set()
+            await _until(lambda: spoken() == ["segunda"])
+        # skipping a line that is playing ends it and tells the players to stop
+        speak = next(m for m in ws.sent if m["type"] == "speak")
+        assert "pulada" in await app.command("skip")
+        await _until(lambda: app.speaking is None)
+        assert {"type": "stop", "id": speak["id"]} in ws.sent
+        engine.release.set()
+        worker.cancel()
+
+    asyncio.run(run())
+
+
+def test_stop_also_frees_a_generation_in_progress():
+    async def run():
+        app = App({}, TTS({"engine": "dummy"}))
+        engine = app.tts.engine = _StuckEngine(True)
+        worker = asyncio.create_task(app.speech_worker())
+        await app.say("ana", "travada")
+        await _until(lambda: app.generating is not None and engine.calls)
+        await app.command("stop")
+        await _until(lambda: app.generating is None)
+        engine.release.set()
+        worker.cancel()
+
+    asyncio.run(run())

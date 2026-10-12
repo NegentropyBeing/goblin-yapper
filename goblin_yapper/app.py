@@ -7,7 +7,9 @@ import asyncio
 import itertools
 import json
 import logging
+import math
 import re
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -103,7 +105,14 @@ class App:
         tcfg = self.cfg.get("teams", {})
         self.sorter = TeamSorter(tcfg.get("count", 2), tcfg.get("auto_assign_late", True))
         self.sorter.queue_open = tcfg.get("queue_open_on_start", False)
-        self.voice = VoiceController(self.sorter, multi=bool(self.cfg.get("voice", {}).get("multi", False)))
+        vcfg = self.cfg.get("voice", {})
+        self.voice = VoiceController(self.sorter, multi=bool(vcfg.get("multi", False)))
+        # the two timers of tick(): chatters silent for too long leave; the voice moves on by itself
+        self.inactive = {"on": bool(tcfg.get("inactive_remove", False)), "minutes": float(tcfg.get("inactive_minutes", 10))}
+        self.rotate = {"on": bool(vcfg.get("rotate", False)), "minutes": float(vcfg.get("rotate_minutes", 5))}
+        self.now = time.monotonic
+        self.last_seen: dict[str, float] = {}    # chatter in the game -> time of their last chat message
+        self.voice_since: dict[str, float] = {}  # speaker -> when they got the voice
         self.tts.team_profiles.update(self.cfg.get("tts", {}).get("team_profiles", {}))
         self.tints = load_tints(tcfg)
         tw = self.cfg.get("twitch", {})
@@ -119,6 +128,9 @@ class App:
         self.gen = 0                       # bumped on stop/speaker change to discard stale speech
         self.ids = itertools.count(1)
         self.speaking: Utterance | None = None
+        self.generating: Utterance | None = None  # line the TTS is working on right now
+        self._synth: asyncio.Future | None = None
+        self._skipped = False
         self.pending: Counter[str] = Counter()  # queued utterances per user
         self.tts_service = None  # TTSService, set by __main__
         self.channel: str = ""
@@ -152,6 +164,8 @@ class App:
 
     def _set_chat_status(self, status: str) -> None:
         self.chat_status = status
+        if status == "conectado":
+            self.last_seen.clear()  # nobody could be heard while the chat was down: restart the inactivity clocks
         self._bg(self.broadcast(self.state()))
 
     async def _chat_loop(self, channel: str) -> None:
@@ -173,6 +187,10 @@ class App:
                       "team": self.voice.active_team},
             "speakers": [{"id": u, "user": self.sorter.name(u), "team": t} for u, t in self.voice.speakers()],
             "multi_voice": self.voice.multi,
+            "auto_remove": self.inactive,
+            "auto_rotate": self.rotate,
+            "generating": {"user": self.generating.display, "team": self.generating.team}
+                          if self.generating else None,
             # OBS sources currently connected (panels, which only play as a last resort, aren't listed)
             "overlays": [{"team": info["team"], "audio": info["audio"]} for ws, info in self.overlays.items()
                          if ws in self.clients and info.get("role", "overlay") == "overlay"],
@@ -212,6 +230,7 @@ class App:
 
     async def on_chat(self, msg: ChatMessage) -> None:
         first = msg.text.strip().split(" ", 1)[0].lower()
+        self.last_seen[msg.login.lower()] = self.now()  # any message counts as activity (tick() drops outsiders)
         if first in self.join_cmds:
             result = self.sorter.join(msg.login, msg.display)
             if result == "closed":
@@ -255,11 +274,8 @@ class App:
             self.pending[utt.user] -= 1
             if self._stale(utt):
                 continue
-            try:
-                wav = await self.tts.synthesize(utt.text, utt.team)
-            except Exception as e:
-                log.warning("falha no TTS: %s", e)
-                await self.broadcast({"type": "notice", "text": f"TTS falhou: {e}"})
+            wav = await self._generate(utt)
+            if wav is None:
                 continue
             if self._stale(utt):
                 continue
@@ -288,6 +304,43 @@ class App:
             self.audio.pop(utt.id, None)
             await self.broadcast({"type": "idle", "id": utt.id})
 
+    async def _generate(self, utt: Utterance) -> bytes | None:
+        """The line's audio, or None if the TTS failed or the line was skipped meanwhile."""
+        self.generating, self._skipped = utt, False
+        self._synth = asyncio.ensure_future(self.tts.synthesize(utt.text, utt.team))
+        await self.broadcast(self.state())
+        try:
+            return await self._synth
+        except asyncio.CancelledError:
+            if not self._skipped:
+                raise  # the worker itself is being cancelled
+            log.info("fala pulada durante a geração: %s", utt.text)
+        except Exception as e:
+            log.warning("falha no TTS: %s", e)
+            await self.broadcast({"type": "notice", "text": f"TTS falhou: {e}"})
+        finally:
+            self.generating = self._synth = None
+            await self.broadcast(self.state())
+        return None
+
+    def _cancel_generation(self) -> None:
+        if self._synth:
+            self._skipped = True
+            self._synth.cancel()
+
+    async def skip(self) -> str:
+        """Drop the one line in progress (stuck in the TTS, or playing) and go on with the queue."""
+        if self.generating:
+            utt = self.generating
+            self._cancel_generation()
+            return f"fala de {utt.display} pulada (estava sendo gerada)"
+        if self.speaking:
+            utt = self.speaking
+            await self.broadcast({"type": "stop", "id": utt.id})
+            self.ended.set()
+            return f"fala de {utt.display} pulada"
+        raise SorterError("nenhuma fala em andamento")
+
     def on_audio_ended(self, utt_id: int) -> None:
         if self.speaking and self.speaking.id == utt_id:
             self.ended.set()
@@ -305,9 +358,60 @@ class App:
                 kept.append(utt)
         for utt in kept:
             self.speech_q.put_nowait(utt)
+        if self.generating and (users is None or self.generating.user in users):
+            self._cancel_generation()  # don't leave the pipeline waiting for a line nobody will hear
         if self.speaking and (users is None or self.speaking.user in users):
             await self.broadcast({"type": "stop", "id": self.speaking.id})
             self.ended.set()
+
+    # ---- timers --------------------------------------------------------
+
+    async def timers(self) -> None:
+        while True:
+            await asyncio.sleep(1)
+            try:
+                await self.tick()
+            except Exception:
+                log.exception("erro nos temporizadores")
+
+    async def tick(self) -> None:
+        """Inactive chatters leave the queue/teams; a speaker's time with the voice runs out."""
+        now, s, v = self.now(), self.sorter, self.voice
+        before = set(v.users)
+        members = [*s.queue, *(u for m in s.teams.values() for u in m)]
+        # people added by hand (or from before a reconnect) count from the moment they are first seen here
+        self.last_seen = {u: self.last_seen.get(u, now) for u in members}
+        self.voice_since = {u: self.voice_since.get(u, now) for u in v.users}
+        notices = []
+        # only while the chat is connected: otherwise nobody can be heard and everyone would be thrown out
+        if self.inactive["on"] and self.chat_status == "conectado":
+            idle = [u for u in members if now - self.last_seen[u] >= self.inactive["minutes"] * 60]
+            for u in idle:
+                team, had_voice = s.team_of(u), v.is_speaker(u)
+                s.leave(u)
+                v.prune(lambda x, u=u: x != u)
+                # with rotation on, the team doesn't go silent because its speaker was the idle one
+                if had_voice and self.rotate["on"] and team and s.teams[team]:
+                    v.pick_random(team)
+            if idle:
+                notices.append(f"removido(s) por inatividade: {', '.join(map(s.name, idle))}")
+        if self.rotate["on"]:
+            for u in list(v.users):
+                team = s.team_of(u)
+                if u not in v.users or team is None or now - self.voice_since.get(u, now) < self.rotate["minutes"] * 60:
+                    continue
+                if any(utt and utt.user == u for utt in (self.speaking, self.generating)):
+                    continue  # let their current line finish; try again on the next tick
+                new = v.pick_random(team)  # same person again if the team has nobody else
+                self.voice_since[new] = now
+                if new != u:
+                    notices.append(f"voz do time {team} passou para {s.name(new)}")
+        if lost := before - set(v.users):
+            await self.interrupt(lost)
+        if notices:
+            log.info("; ".join(notices))
+            await self.broadcast(self.state())
+            await self.broadcast({"type": "notice", "text": "; ".join(notices), "ok": True})
 
     # ---- operator commands ---------------------------------------------
 
@@ -325,7 +429,10 @@ class App:
   next [time]               outra pessoa do mesmo time
   give <user>               dá voz a alguém específico
   stop [time|user]          tira a voz (sem arg = de todos) e para o áudio
+  skip                      pula a fala em andamento (sendo gerada ou tocando)
   multivoice <on|off>       um falante por time ao mesmo tempo
+  autoremove <on|off> [min] tira da fila/times quem ficar [min] minutos sem falar no chat
+  autorotate <on|off> [min] passa a voz para outra pessoa do time a cada [min] minutos
   channel <canal|off>       conecta ao chat de outro canal
   tint <time> <#cor|off> [força 0-1]   muda a tinta do goblin do time
   teamvoice <time|default> <perfil|none>   perfil de voz do time (aba Voz)
@@ -359,6 +466,8 @@ class App:
                 phrase = self.tts_cfg.get("test_phrase", "Fala chat! Aqui é o goblin do time {team}.").replace("{team}", team)
                 ok = await self.say(f"teste {team}", phrase, team=team)
                 return f"testando a voz do time {team}" if ok else "fila de testes cheia, aguarde"
+            if cmd == "skip":
+                return await self.skip()
             if cmd == "engine":
                 if not args:
                     raise SorterError("uso: engine <server|sapi|dummy|custom>")
@@ -479,6 +588,26 @@ class App:
             v.set_multi(on)
             self.persist({"voice": {"multi": on}})
             return "vários times podem falar ao mesmo tempo" if on else "só uma pessoa com a voz por vez"
+        if cmd in ("autoremove", "autorotate"):
+            opt, section, key = ((self.inactive, "teams", "inactive") if cmd == "autoremove"
+                                 else (self.rotate, "voice", "rotate"))
+            if not args or args[0].lower() not in ("on", "off"):
+                raise SorterError(f"uso: {cmd} <on|off> [minutos]")
+            if len(args) > 1:
+                try:
+                    minutes = float(args[1].replace(",", "."))
+                except ValueError:
+                    minutes = 0.0
+                if not (math.isfinite(minutes) and 0 < minutes <= 1440):
+                    raise SorterError("minutos deve ser um número entre 0 e 1440")
+                opt["minutes"] = minutes
+            opt["on"] = args[0].lower() == "on"
+            on_key = "inactive_remove" if cmd == "autoremove" else "rotate"
+            self.persist({section: {on_key: opt["on"], f"{key}_minutes": opt["minutes"]}})
+            if cmd == "autoremove":
+                return (f"inativos saem após {opt['minutes']:g} min sem falar no chat" if opt["on"]
+                        else "remoção de inativos desligada")
+            return f"a voz troca de pessoa a cada {opt['minutes']:g} min" if opt["on"] else "rotação da voz desligada"
         raise SorterError(f"comando desconhecido: {cmd} (digite help)")
 
     def describe(self) -> str:

@@ -1,9 +1,28 @@
 # Changelog
 
-## Unreleased
+## v0.5.0
+
+Windows installer: `Goblin Yapper_0.5.0_x64_pt-BR.msi`.
+
+- **Tirar inativos** toggle (Goblin tab): chatters in the queue or in a team who write nothing in chat for N
+  minutes are removed automatically. Only counts while the chat is connected; the clocks restart on reconnect.
+  Command: `autoremove <on|off> [min]`.
+- **Trocar quem tem a voz** toggle: after N minutes the voice goes to another random chatter of the same team,
+  once the line being spoken ends. Each team's speaker has its own clock in multi-voice mode. Command:
+  `autorotate <on|off> [min]`.
+- **⏭ Pular fala** button: drops the one line in progress, whether stuck in generation or playing, and goes on
+  with the queue. The panel shows whose line is being generated or spoken. Command: `skip`. **Parar voz** now
+  also frees a generation in progress instead of waiting for it.
 
 - Fixed: transcribing a reference clip failed with `ffmpeg was not found` on a PC without ffmpeg installed.
   Transcription no longer needs ffmpeg.
+- **Descarregar Whisper** button on the Voz tab, shown while Whisper is loaded: unloads the transcription model
+  right away and frees its VRAM (about 1.5 GB). It loads again by itself on the next transcription.
+- **Much lower VRAM use by the voice server.** Creating a voice profile no longer spikes by 3 to 6 GB (it could
+  fill an 8 GB card), the memory a job used is given back to the GPU right after it instead of staying
+  reserved, and Whisper is unloaded as soon as the profile is created. Measured on OmniVoice: about 2 GB idle
+  and under 3 GB while speaking. The Voz tab now shows the model's own VRAM next to the whole card's.
+
 - **Desligar modelo / Ligar modelo** button on the Voz tab: turns the OmniVoice model off (ending the voice
   server process, which frees its VRAM) and back on without closing the app. It is on again at the next app start.
 - **Per-team goblin images**: the panel now has a png + gif slot pair for each team, next to the shared

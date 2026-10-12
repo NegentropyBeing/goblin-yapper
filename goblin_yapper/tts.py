@@ -56,6 +56,8 @@ def samples_to_wav(samples, sample_rate: int) -> bytes:
 
 class Engine:
     name = "base"
+    # True if synthesize() may be called again while an abandoned (skipped) call is still running
+    reentrant = False
 
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -69,6 +71,7 @@ class Engine:
 
 class DummyEngine(Engine):
     name = "dummy"
+    reentrant = True
 
     def synthesize(self, text: str, voice: dict) -> bytes:
         sr = 22050
@@ -98,6 +101,7 @@ $s.Dispose()
 
 class SapiEngine(Engine):
     name = "sapi"
+    reentrant = True
 
     def synthesize(self, text: str, voice: dict) -> bytes:
         fd, out = tempfile.mkstemp(suffix=".wav")
@@ -118,6 +122,7 @@ class ServerEngine(Engine):
     parameters come from the server's own settings and the profile."""
 
     name = "server"
+    reentrant = True  # the server queues the requests itself
 
     def synthesize(self, text: str, voice: dict) -> bytes:
         import json
@@ -208,5 +213,16 @@ class TTS:
         log.info("TTS pronto (engine=%s)", self.engine.name)
 
     async def synthesize(self, text: str, team: str | None) -> bytes:
-        async with self._lock:
-            return await asyncio.to_thread(self.engine.synthesize, text, self.voice_for(team))
+        await self._lock.acquire()
+        reentrant = self.engine.reentrant
+        work = asyncio.ensure_future(asyncio.to_thread(self.engine.synthesize, text, self.voice_for(team)))
+        try:
+            return await asyncio.shield(work)
+        finally:
+            # Cancelled (the line was skipped): the worker thread can't be stopped and keeps running.
+            # Engines that can't take a second call meanwhile keep the lock until it ends.
+            if work.done() or reentrant:
+                self._lock.release()
+            else:
+                work.add_done_callback(lambda _: self._lock.release())
+            work.add_done_callback(lambda f: f.cancelled() or f.exception())  # an abandoned failure is fine

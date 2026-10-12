@@ -11,6 +11,7 @@ Runs in its own Python environment (PyTorch + the TTS engine), started by the ap
   POST   /pipeline/prepare                raw audio body -> cleaned reference draft (?trim=1&normalize=1&max_seconds=20)
   GET    /pipeline/<draft>/reference.wav
   POST   /pipeline/<draft>/transcribe     -> {"text": ...}  (Whisper; unloaded again when idle)
+  POST   /asr/release                     unload Whisper now, freeing its VRAM
   POST   /profiles                        {"draft_id", "name", "ref_text", "params"?} -> builds the cached voice
   PATCH  /profiles/<id>                   {"name"?, "ref_text"? (rebuilds), "params"?}
   DELETE /profiles/<id>
@@ -151,6 +152,12 @@ class TTSServer:
         loop = asyncio.get_running_loop()
         self._asr_timer = loop.call_later(ASR_IDLE_SECONDS, lambda: loop.create_task(self.gpu("liberando Whisper", self.engine.release_asr)))
 
+    async def release_asr_now(self) -> None:
+        if self._asr_timer:
+            self._asr_timer.cancel()
+            self._asr_timer = None
+        await self.gpu("liberando Whisper", self.engine.release_asr)
+
 
 def make_app(srv: TTSServer) -> web.Application:
     routes = web.RouteTableDef()
@@ -248,7 +255,14 @@ def make_app(srv: TTSServer) -> web.Application:
         srv.write_profile(meta)
         shutil.rmtree(d, ignore_errors=True)
         log.info("perfil criado: %s (%s)", name, pid)
+        if srv._asr_timer:  # the draft is done with Whisper: don't hold its VRAM for the idle timeout
+            await srv.release_asr_now()
         return web.json_response(srv.read_profile(pid))
+
+    @routes.post("/asr/release")
+    async def release_asr(_):
+        await srv.release_asr_now()
+        return web.json_response({"ok": True})
 
     @routes.get("/profiles")
     async def profiles(_):

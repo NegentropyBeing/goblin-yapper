@@ -90,6 +90,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     log.info("painel: http://%s:%s/panel  |  overlay: http://%s:%s/overlay", host, port, host, port)
 
     worker = asyncio.create_task(app.speech_worker())
+    timers = asyncio.create_task(app.timers())
     if args.parent_pid:
         watchdog = asyncio.create_task(watch_parent(args.parent_pid))  # noqa: F841 (kept alive by the loop)
     if not args.no_chat:
@@ -105,6 +106,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
         await worker
     finally:
         worker.cancel()
+        timers.cancel()
         if app.chat_task:
             app.chat_task.cancel()
         await app.tts_service.close()
