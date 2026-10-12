@@ -93,7 +93,12 @@ class OmniVoiceEngine(Engine):
         if getattr(self.model, "_asr_pipe", None) is None:
             log.info("carregando Whisper para transcrição...")
             self.model.load_asr_model()
-        return self.model.transcribe(str(wav)).strip()
+        # Samples, not the path: given a path, the Whisper pipeline decodes it with ffmpeg, which a
+        # clean Windows install does not have.
+        import soundfile as sf
+
+        samples, sr = sf.read(str(wav), dtype="float32", always_2d=True)
+        return self.model.transcribe((samples.mean(axis=1), sr)).strip()
 
     def release_asr(self) -> None:
         if getattr(self.model, "_asr_pipe", None) is not None:

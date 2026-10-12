@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: transcribing a reference clip failed with `ffmpeg was not found` on a PC without ffmpeg installed.
+  Transcription no longer needs ffmpeg.
 - **Desligar modelo / Ligar modelo** button on the Voz tab: turns the OmniVoice model off (ending the voice
   server process, which frees its VRAM) and back on without closing the app. It is on again at the next app start.
 - **Per-team goblin images**: the panel now has a png + gif slot pair for each team, next to the shared
