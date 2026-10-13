@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from goblin_yapper.app import App, strip_emotes
+from goblin_yapper.app import CHORUS_TEXT, CHORUS_TRIGGER, App, strip_emotes
 from goblin_yapper.teams import QUEUE, SorterError, TeamSorter
 from goblin_yapper.tts import TTS, wav_duration
 from goblin_yapper.twitch import ChatMessage, parse_line
@@ -619,5 +619,52 @@ def test_hideidle_toggle_is_saved_and_sent_to_overlays(tmp_path):
         await app.command("hideidle off")
         assert app.state()["hide_idle"] is False
         assert (await app.command("hideidle")).startswith("erro")
+
+    asyncio.run(run())
+
+
+def test_chorus_every_team_voice_says_the_phrase_together():
+    async def run():
+        app, s = _app_with_overlays(main=(None, True), azul=("azul", True))
+        calls = []
+        synth = app.tts.engine.synthesize
+        app.tts.engine.synthesize = lambda text, voice: calls.append(voice.get("profile")) or synth(text, voice)
+        worker = asyncio.create_task(app.speech_worker())
+        speaks = lambda name: [m for m in s[name].sent if m["type"] == "speak"]
+
+        # someone else sending the glyph (even with the voice) doesn't start it
+        await app.on_chat(ChatMessage("outro", "Outro", CHORUS_TRIGGER, {}))
+        assert app.speech_q.empty()
+
+        # the one chatter does, without being in the game
+        await app.on_chat(ChatMessage("NegentropyBeing", "NegentropyBeing", CHORUS_TRIGGER, {}))
+        await _until(lambda: len(app.playing) == 2)
+        await asyncio.sleep(0.02)
+        assert len(calls) == 2  # one clip per team, even with the same voice settings
+        lines = speaks("panel")
+        assert [m["team"] for m in lines] == ["azul", "verde"] and len({m["id"] for m in lines}) == 2
+        assert all(m["text"] == CHORUS_TEXT and m["id"] in app.audio for m in lines)
+        # each team's clip goes to its own source, or to the main one
+        assert [m["play"] for m in speaks("azul")] == [True, False]
+        assert [m["play"] for m in speaks("main")] == [False, True]
+        # the line is over only when every player has finished
+        app.on_audio_ended(lines[0]["id"])
+        await asyncio.sleep(0.03)
+        assert app.speaking is not None
+        app.on_audio_ended(lines[1]["id"])
+        await _until(lambda: app.speaking is None)
+        await asyncio.sleep(0.02)
+        assert [m["id"] for m in s["panel"].sent if m["type"] == "idle"] == [m["id"] for m in lines]
+        assert not app.audio
+
+        # again: the clips are reused, and skip cuts all of them
+        await app.on_chat(ChatMessage("negentropybeing", "NegentropyBeing", CHORUS_TRIGGER, {}))
+        await _until(lambda: len(app.playing) == 2)
+        assert len(calls) == 2  # one clip per team, even with the same voice settings
+        ids = [u.id for u in app.playing]
+        assert not (await app.command("skip")).startswith("erro")
+        await _until(lambda: app.speaking is None)
+        assert [m["id"] for m in s["panel"].sent if m["type"] == "stop"] == ids
+        worker.cancel()
 
     asyncio.run(run())

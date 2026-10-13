@@ -64,8 +64,12 @@ if (!SHOW_LABEL) document.body.classList.add("nolabel");
 const goblinEl = document.getElementById("goblin");
 const labelEl = document.getElementById("label");
 const unlockEl = document.getElementById("unlock");
-let assets = {}, state = null, talkingTeam = null, talkingUser = null, currentId = null;
-const audio = new Audio();
+let assets = {}, state = null;
+// Lines playing now: id -> {team, user, audio (only for the ones this source plays)}. Usually one;
+// several at once when every team speaks together.
+const lines = new Map();
+const lastLine = () => [...lines.values()].pop();
+const teamTalking = (team) => [...lines.values()].some(l => l.team === team);
 let ws;
 
 const PLACEHOLDER = (color) => `
@@ -93,18 +97,18 @@ const PLACEHOLDER = (color) => `
 // ("default" goblin for someone with the voice but no team); hidden when nobody does.
 function displayTeam() {
   if (PIN_TEAM) {
-    const inUse = talkingTeam === PIN_TEAM || (state?.speakers || []).some(sp => sp.team === PIN_TEAM);
+    const inUse = teamTalking(PIN_TEAM) || (state?.speakers || []).some(sp => sp.team === PIN_TEAM);
     return inUse || !state?.hide_idle || PREVIEW ? PIN_TEAM : null;
   }
-  if (currentId === null && !state?.voice?.user) return null;
-  return talkingTeam || state?.voice?.team || "default";
+  if (!lines.size && !state?.voice?.user) return null;
+  return lastLine()?.team || state?.voice?.team || "default";
 }
 
 let renderedKey = null;
 function render() {
   const team = displayTeam();
   goblinEl.classList.toggle("hidden", !team);
-  const talking = currentId !== null && (!PIN_TEAM || talkingTeam === PIN_TEAM);
+  const talking = PIN_TEAM ? teamTalking(PIN_TEAM) : lines.size > 0;
   const a = assets[team] || assets.default || {};
   const tint = state?.tints?.[team];  // {color, strength}; none for the "default" goblin
   const color = tint?.color || "#7fbf3f";
@@ -127,7 +131,7 @@ function render() {
   const speakers = state?.speakers || [];
   const who = PIN_TEAM
     ? speakers.find(sp => sp.team === PIN_TEAM)
-    : (currentId !== null && talkingUser ? { user: talkingUser, team: talkingTeam } : state?.voice);
+    : (lastLine()?.user ? lastLine() : state?.voice);
   const showName = SHOW_LABEL && !!who?.user;
   labelEl.textContent = showName ? who.user : "";
   labelEl.style.background = showName && who.team && state.tints[who.team] ? (state.tints[who.team].color + "cc") : "#0008";
@@ -135,19 +139,21 @@ function render() {
 }
 
 function stopTalking(id) {
-  if (id !== undefined && id !== currentId) return;
-  currentId = null; talkingTeam = null; talkingUser = null;
-  if (PLAY_AUDIO) { audio.pause(); audio.removeAttribute("src"); }
+  const line = lines.get(id);
+  if (!line) return;
+  lines.delete(id);
+  if (line.audio) { line.audio.onended = line.audio.onerror = null; line.audio.pause(); }
   render();
 }
 
 function onSpeak(msg) {
-  currentId = msg.id; talkingTeam = msg.team; talkingUser = msg.user;
+  const line = { team: msg.team, user: msg.user };
+  lines.set(msg.id, line);
   render();
   // The server picks one overlay per line (msg.play): this team's own source if it has audio,
   // otherwise the main one. Every overlay still gets the line, to animate its goblin if it's the speaker's.
   if (!PLAY_AUDIO || !msg.play) return;
-  audio.src = msg.url;
+  const audio = line.audio = new Audio(msg.url);
   audio.onended = () => { send({ type: "ended", id: msg.id }); stopTalking(msg.id); };
   audio.onerror = audio.onended;
   audio.play().catch(() => { unlockEl.style.display = "block"; audio.onended(); });
@@ -166,10 +172,14 @@ function connect() {
     else if (msg.type === "idle" || msg.type === "stop") stopTalking(msg.id);
     else if (msg.type === "assets") loadAssets();
   };
-  ws.onclose = () => setTimeout(connect, 1500);
+  ws.onclose = () => {
+    // their "idle" would be missed while offline; the ones playing here end by themselves
+    for (const [id, line] of lines) if (!line.audio) lines.delete(id);
+    render(); setTimeout(connect, 1500);
+  };
 }
 
-unlockEl.onclick = () => { unlockEl.style.display = "none"; audio.play().catch(() => {}); };
+unlockEl.onclick = () => { unlockEl.style.display = "none"; };  // the click itself lets the next lines play
 function loadAssets() {
   return fetch("/api/assets").then(r => r.json()).then(a => { assets = a.teams; renderedKey = null; render(); });
 }

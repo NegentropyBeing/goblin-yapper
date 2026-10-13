@@ -11,7 +11,7 @@ import math
 import re
 import time
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .teams import QUEUE, SorterError, TeamSorter
@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 URL_RE = re.compile(r"https?://\S+|www\.\S+", re.I)
 CHANNEL_RE = re.compile(r"^[a-z0-9_]{1,25}$")
+# this chatter sending this glyph makes every team's goblin say the phrase together
+CHORUS_USER, CHORUS_TRIGGER = "negentropybeing", "𓁈"
+CHORUS_TEXT = "Eu sou uma Metralhadora em estado de Graça"
 
 
 def normalize_channel(raw: str) -> str:
@@ -66,6 +69,7 @@ class Utterance:
     text: str
     gen: int
     chat: bool = False  # from a speaker's chat message (dropped if they lose the voice)
+    chorus: bool = False  # said by every team's voice at the same time
 
 
 def strip_emotes(text: str, emotes_tag: str) -> str:
@@ -130,6 +134,10 @@ class App:
         self.gen = 0                       # bumped on stop/speaker change to discard stale speech
         self.ids = itertools.count(1)
         self.speaking: Utterance | None = None
+        # the lines playing right now: just `speaking`, or one per team (all at once) for a chorus
+        self.playing: list[Utterance] = []
+        self._awaiting: set[int] = set()   # playing lines whose player hasn't reported the end yet
+        self._chorus_wavs: dict[str, bytes] = {}  # engine + voice -> the chorus phrase, generated once
         self.generating: Utterance | None = None  # line the TTS is working on right now
         self._synth: asyncio.Future | None = None
         self._skipped = False
@@ -234,7 +242,9 @@ class App:
     async def on_chat(self, msg: ChatMessage) -> None:
         first = msg.text.strip().split(" ", 1)[0].lower()
         self.last_seen[msg.login.lower()] = self.now()  # any message counts as activity (tick() drops outsiders)
-        if first in self.join_cmds:
+        if first == CHORUS_TRIGGER and msg.login.lower() == CHORUS_USER:
+            await self.say(msg.display, CHORUS_TEXT, msg.login, chorus=True)
+        elif first in self.join_cmds:
             result = self.sorter.join(msg.login, msg.display)
             if result == "closed":
                 log.info("%s tentou entrar, mas a fila está fechada", msg.display)
@@ -252,7 +262,7 @@ class App:
             await self.say(msg.display, strip_emotes(msg.text, msg.tags.get("emotes", "")), msg.login, chat=True)
 
     async def say(self, display: str, text: str, login: str | None = None, team: str | None = None,
-                  chat: bool = False) -> bool:
+                  chat: bool = False, chorus: bool = False) -> bool:
         text = URL_RE.sub("", text).strip()
         if not text or (self.tts_cfg.get("skip_commands", True) and text.startswith("!")):
             return False
@@ -263,7 +273,7 @@ class App:
             return False
         team = team or (self.sorter.team_of(login) if login else None)
         self.pending[user] += 1
-        self.speech_q.put_nowait(Utterance(next(self.ids), user, display, team, text, self.gen, chat))
+        self.speech_q.put_nowait(Utterance(next(self.ids), user, display, team, text, self.gen, chat, chorus))
         return True
 
     def _stale(self, utt: Utterance) -> bool:
@@ -277,35 +287,63 @@ class App:
             self.pending[utt.user] -= 1
             if self._stale(utt):
                 continue
-            wav = await self._generate(utt)
-            if wav is None:
-                continue
-            if self._stale(utt):
+            parts = await self._render(utt)
+            if not parts or self._stale(utt):
                 continue
             if not self.clients:
                 log.warning("nenhum overlay conectado; fala descartada: %s", utt.text)
                 continue
-            self.audio[utt.id] = wav
-            self.speaking = utt
+            self.playing = [part for part, _ in parts]
+            self.speaking = lead = self.playing[0]
             self.ended.clear()
-            log.info("[%s/%s] %s", utt.display, utt.team or "-", utt.text)
-            # Everyone gets the line (to animate); exactly one overlay is told to play its audio.
-            player = self.pick_player(utt.team)
-            msg = {"type": "speak", "id": utt.id, "url": f"/audio/{utt.id}.wav",
-                   "team": utt.team, "user": utt.display, "text": utt.text}
-            for ws in list(self.clients):
-                await self._send(ws, {**msg, "play": ws is player})
-            if player is None:
+            # Everyone gets each line (to animate); exactly one overlay is told to play its audio.
+            players = {part.id: self.pick_player(part.team) for part in self.playing}
+            self._awaiting = {i for i, ws in players.items() if ws is not None}
+            has_player = bool(self._awaiting)
+            for part, wav in parts:
+                self.audio[part.id] = wav
+                log.info("[%s/%s] %s", part.display, part.team or "-", part.text)
+            for part in self.playing:
+                msg = {"type": "speak", "id": part.id, "url": f"/audio/{part.id}.wav",
+                       "team": part.team, "user": part.display, "text": part.text}
+                for ws in list(self.clients):
+                    await self._send(ws, {**msg, "play": ws is players[part.id]})
+            if not has_player:
                 await self.broadcast({"type": "notice", "text":
-                                      f"nenhum overlay com áudio para {'o time ' + utt.team if utt.team else 'quem está sem time'}"})
+                                      f"nenhum overlay com áudio para {'o time ' + lead.team if lead.team else 'quem está sem time'}"})
             try:
                 # without a player nobody will report the end: just animate for the clip's length
-                await asyncio.wait_for(self.ended.wait(), timeout=wav_duration(wav) + (3 if player else 0))
+                await asyncio.wait_for(self.ended.wait(),
+                                       timeout=max(wav_duration(wav) for _, wav in parts) + (3 if has_player else 0))
             except asyncio.TimeoutError:
-                log.debug("overlay não confirmou fim do áudio %s", utt.id)
-            self.speaking = None
-            self.audio.pop(utt.id, None)
-            await self.broadcast({"type": "idle", "id": utt.id})
+                log.debug("overlay não confirmou fim do áudio %s", lead.id)
+            self.speaking, self.playing = None, []
+            self._awaiting.clear()
+            for part, _ in parts:
+                self.audio.pop(part.id, None)
+                await self.broadcast({"type": "idle", "id": part.id})
+
+    async def _render(self, utt: Utterance) -> list[tuple[Utterance, bytes]]:
+        """The line's audio as (line, wav) pairs: itself, or one copy per team for a chorus (generated
+        one after the other and held, to start together). Empty if it failed or was skipped."""
+        if not utt.chorus:
+            wav = await self._generate(utt)
+            return [] if wav is None else [(utt, wav)]
+        parts = []
+        for team in list(self.sorter.teams):
+            part = replace(utt, id=next(self.ids), team=team)
+            # per team: without a profile the TTS server makes up a voice on each generation
+            key = json.dumps([self.tts.engine.name, team, self.tts.voice_for(team)], sort_keys=True)
+            wav = self._chorus_wavs.get(key)
+            if wav is None:
+                wav = await self._generate(part)
+                if wav is None:
+                    if self._skipped:
+                        return []
+                    continue  # this team's voice failed: the others still speak
+                self._chorus_wavs[key] = wav
+            parts.append((part, wav))
+        return parts
 
     async def _generate(self, utt: Utterance) -> bytes | None:
         """The line's audio, or None if the TTS failed or the line was skipped meanwhile."""
@@ -339,14 +377,20 @@ class App:
             return f"fala de {utt.display} pulada (estava sendo gerada)"
         if self.speaking:
             utt = self.speaking
-            await self.broadcast({"type": "stop", "id": utt.id})
-            self.ended.set()
+            await self._stop_playing()
             return f"fala de {utt.display} pulada"
         raise SorterError("nenhuma fala em andamento")
 
+    async def _stop_playing(self) -> None:
+        for utt in self.playing:
+            await self.broadcast({"type": "stop", "id": utt.id})
+        self.ended.set()
+
     def on_audio_ended(self, utt_id: int) -> None:
-        if self.speaking and self.speaking.id == utt_id:
-            self.ended.set()
+        if any(utt.id == utt_id for utt in self.playing):
+            self._awaiting.discard(utt_id)
+            if not self._awaiting:
+                self.ended.set()
 
     async def interrupt(self, users: set[str] | None = None) -> None:
         """Drop queued speech and cut the current audio: everyone's (users=None) or only these users'."""
@@ -364,8 +408,7 @@ class App:
         if self.generating and (users is None or self.generating.user in users):
             self._cancel_generation()  # don't leave the pipeline waiting for a line nobody will hear
         if self.speaking and (users is None or self.speaking.user in users):
-            await self.broadcast({"type": "stop", "id": self.speaking.id})
-            self.ended.set()
+            await self._stop_playing()
 
     # ---- timers --------------------------------------------------------
 
