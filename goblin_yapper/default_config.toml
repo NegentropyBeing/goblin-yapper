@@ -34,6 +34,9 @@ multi = false                # um falante por time ao mesmo tempo
 rotate = false               # passar a voz para outra pessoa do time sozinho (também no painel)
 rotate_minutes = 5
 
+[overlay]
+hide_idle = false            # fontes de time escondem o goblin enquanto o time está sem voz (também no painel)
+
 [server]
 host = "127.0.0.1"
 port = 8765

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Esconder o goblin dos times que estão sem voz** toggle (Goblin tab, under the OBS sources): a team's OBS
+  source shows its goblin only while someone on that team has the voice, or one of its lines is playing. Off by
+  default. Command: `hideidle <on|off>`.
+
 ## v0.5.0
 
 Windows installer: `Goblin Yapper_0.5.0_x64_pt-BR.msi`.

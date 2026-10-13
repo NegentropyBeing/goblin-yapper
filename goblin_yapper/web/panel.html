@@ -246,6 +246,8 @@
     <div>
       <h3>Fontes de navegador para o OBS</h3>
       <div class="urls" id="urls"></div>
+      <label class="toggle" style="margin-top:8px" title="A fonte de cada time só mostra o goblin enquanto alguém do time tem a voz (ou durante um teste de fala do time). A fonte principal já funciona assim.">
+        <input type="checkbox" id="hideIdle"> esconder o goblin dos times que estão sem voz</label>
       <h3 style="margin-top:14px">Pasta de dados</h3>
       <div class="pill" id="dataInfo"></div>
     </div>
@@ -426,6 +428,7 @@ function render() {
 
   renderSpeakers();
   $("#multiVoice").checked = state.multi_voice;
+  $("#hideIdle").checked = state.hide_idle;
   $("#nextBtn").disabled = !state.voice.user;
   $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? "Parar todos" : "Parar voz";
   renderLine();
@@ -609,6 +612,7 @@ document.addEventListener("click", async (e) => {
 });
 
 $("#multiVoice").addEventListener("change", (e) => cmd(`multivoice ${e.target.checked ? "on" : "off"}`));
+$("#hideIdle").addEventListener("change", (e) => cmd(`hideidle ${e.target.checked ? "on" : "off"}`));
 for (const [id, command] of [["autoRemove", "autoremove"], ["autoRotate", "autorotate"]]) {
   const send = () => cmd(`${command} ${$(`#${id}`).checked ? "on" : "off"} ${$(`#${id}Min`).value}`.trim());
   $(`#${id}`).addEventListener("change", send);
@@ -961,10 +965,26 @@ function renderProfiles() {
         `<span class="tag" style="--team:${t === "default" ? "var(--muted)" : teamColor(t)}">${t === "default" ? "padrão" : esc(t)}</span>`).join("")}</div>` : ""}
     </li>`;
   }).join("");
+  syncProfilePlay();
 }
 
+// The ▶ of the profile whose reference is playing becomes ⏸.
+let profilePlaying = null;
+function syncProfilePlay() {
+  document.querySelectorAll("#vzProfiles [data-vz=play]").forEach(b => {
+    const on = !profileAudio.paused && b.closest("[data-profile]").dataset.profile === profilePlaying;
+    b.textContent = on ? "⏸" : "▶";
+    b.title = on ? "Pausar" : "Ouvir a referência";
+  });
+}
+for (const ev of ["play", "pause", "ended", "error"]) profileAudio.addEventListener(ev, syncProfilePlay);
+
 async function vzProfileAction(action, id, li) {
-  if (action === "play") { profileAudio.src = `/api/tts/profiles/${id}/reference.wav`; profileAudio.play().catch(() => {}); }
+  if (action === "play") {
+    // same profile again: pause / resume where it stopped; another profile: start that one
+    if (profilePlaying !== id) { profilePlaying = id; profileAudio.src = `/api/tts/profiles/${id}/reference.wav`; }
+    if (profileAudio.paused) profileAudio.play().catch(() => {}); else profileAudio.pause();
+  }
   else if (action === "params") { vzSetScope(id); $("#vzScope").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
   else if (action === "edit") { editing = id; renderProfiles(); }
   else if (action === "cancel-edit") { editing = null; renderProfiles(); }

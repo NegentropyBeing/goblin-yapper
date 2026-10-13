@@ -604,3 +604,20 @@ def test_stop_also_frees_a_generation_in_progress():
         worker.cancel()
 
     asyncio.run(run())
+
+
+def test_hideidle_toggle_is_saved_and_sent_to_overlays(tmp_path):
+    async def run():
+        settings = tmp_path / "settings.json"
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}), settings_path=settings)
+        assert app.state()["hide_idle"] is False  # off by default
+        assert not (await app.command("hideidle on")).startswith("erro")
+        assert app.state()["hide_idle"] is True
+        assert json.loads(settings.read_text(encoding="utf-8"))["overlay"] == {"hide_idle": True}
+        # kept on the next start
+        assert App({}, TTS({"engine": "dummy"}), settings_path=settings).state()["hide_idle"] is True
+        await app.command("hideidle off")
+        assert app.state()["hide_idle"] is False
+        assert (await app.command("hideidle")).startswith("erro")
+
+    asyncio.run(run())

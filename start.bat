@@ -8,5 +8,5 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-".venv\Scripts\python.exe" -m goblin_yapper %*
+".venv\Scripts\python.exe" -m goblin_yapper --open %*
 if errorlevel 1 pause

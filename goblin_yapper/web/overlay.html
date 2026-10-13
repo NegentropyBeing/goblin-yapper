@@ -54,6 +54,7 @@ const params = new URLSearchParams(location.search);
 const PIN_TEAM = params.get("team");
 const PLAY_AUDIO = params.get("audio") !== "0";
 const SHOW_LABEL = params.get("label") !== "0";
+const PREVIEW = params.has("preview");  // the panel's thumbnails
 if (params.get("size")) {  // fixed box; without it the goblin fills the source
   document.documentElement.style.setProperty("--size", params.get("size") + "px");
   document.body.classList.add("fixed");
@@ -87,10 +88,14 @@ const PLACEHOLDER = (color) => `
   </g>
 </svg>`;
 
-// Pinned source: always its team. Main source: whoever is talking / has the voice
+// Pinned source: always its team; with "hide idle" on (panel toggle), only while the team has a
+// speaker or a line of its own playing. Main source: whoever is talking / has the voice
 // ("default" goblin for someone with the voice but no team); hidden when nobody does.
 function displayTeam() {
-  if (PIN_TEAM) return PIN_TEAM;
+  if (PIN_TEAM) {
+    const inUse = talkingTeam === PIN_TEAM || (state?.speakers || []).some(sp => sp.team === PIN_TEAM);
+    return inUse || !state?.hide_idle || PREVIEW ? PIN_TEAM : null;
+  }
   if (currentId === null && !state?.voice?.user) return null;
   return talkingTeam || state?.voice?.team || "default";
 }
@@ -105,7 +110,7 @@ function render() {
   const color = tint?.color || "#7fbf3f";
   const strength = tint?.strength ?? 0;
   const key = `${team}|${talking}|${color}|${strength}|${a.idle}|${a.talk}`;
-  if (key !== renderedKey) {
+  if (team && key !== renderedKey) {  // a hidden goblin keeps its last image while it fades out
     renderedKey = key;
     const src = talking ? (a.talk || a.idle) : (a.idle || a.talk);
     if (src) {
@@ -153,7 +158,7 @@ function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 function connect() {
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   // ?preview=1 (the panel's thumbnails) doesn't count as an OBS source
-  ws.onopen = () => send({ type: "hello", role: params.has("preview") ? "preview" : "overlay", team: PIN_TEAM, audio: PLAY_AUDIO });
+  ws.onopen = () => send({ type: "hello", role: PREVIEW ? "preview" : "overlay", team: PIN_TEAM, audio: PLAY_AUDIO });
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "state") { state = msg; render(); }

@@ -115,6 +115,8 @@ class App:
         self.voice_since: dict[str, float] = {}  # speaker -> when they got the voice
         self.tts.team_profiles.update(self.cfg.get("tts", {}).get("team_profiles", {}))
         self.tints = load_tints(tcfg)
+        # team (pinned) OBS sources hide their goblin while the team has nobody with the voice
+        self.hide_idle = bool(self.cfg.get("overlay", {}).get("hide_idle", False))
         tw = self.cfg.get("twitch", {})
         self.join_cmds = {c.lower() for c in tw.get("join_commands", ["!joinsort", "!joinsorting"])}
         self.leave_cmds = {c.lower() for c in tw.get("leave_commands", ["!leavesort"])}
@@ -196,6 +198,7 @@ class App:
                          if ws in self.clients and info.get("role", "overlay") == "overlay"],
             "speaking": self.speaking.team if self.speaking else None,
             "tints": self.tints,
+            "hide_idle": self.hide_idle,
             "chat": {"channel": self.channel, "status": self.chat_status},
             "tts_engine": self.tts.engine.name,
             "tts_error": self.tts.error,
@@ -433,6 +436,7 @@ class App:
   multivoice <on|off>       um falante por time ao mesmo tempo
   autoremove <on|off> [min] tira da fila/times quem ficar [min] minutos sem falar no chat
   autorotate <on|off> [min] passa a voz para outra pessoa do time a cada [min] minutos
+  hideidle <on|off>         esconde o goblin do time que está sem ninguém com a voz
   channel <canal|off>       conecta ao chat de outro canal
   tint <time> <#cor|off> [força 0-1]   muda a tinta do goblin do time
   teamvoice <time|default> <perfil|none>   perfil de voz do time (aba Voz)
@@ -588,6 +592,13 @@ class App:
             v.set_multi(on)
             self.persist({"voice": {"multi": on}})
             return "vários times podem falar ao mesmo tempo" if on else "só uma pessoa com a voz por vez"
+        if cmd == "hideidle":
+            if not args or args[0].lower() not in ("on", "off"):
+                raise SorterError("uso: hideidle <on|off>")
+            self.hide_idle = args[0].lower() == "on"
+            self.persist({"overlay": {"hide_idle": self.hide_idle}})
+            return ("goblins dos times somem enquanto o time está sem voz" if self.hide_idle
+                    else "goblins dos times sempre visíveis")
         if cmd in ("autoremove", "autorotate"):
             opt, section, key = ((self.inactive, "teams", "inactive") if cmd == "autoremove"
                                  else (self.rotate, "voice", "rotate"))
