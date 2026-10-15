@@ -25,6 +25,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi"],
+    "publisher": "Cintamani",
     "category": "Utility",
     "shortDescription": "Twitch team sorter + goblin TTS overlay",
     "icon": [
