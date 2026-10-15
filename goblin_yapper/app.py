@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 CHANNEL_RE = re.compile(r"^[a-z0-9_]{1,25}$")
+LEGACY_TEST_PHRASE = "Fala chat! Aqui é o goblin do time {team}."  # what default_config.toml used to set
 # this chatter sending this glyph makes every team's goblin say the phrase together
 CHORUS_USER, CHORUS_TRIGGER = "negentropybeing", "𓁈"
 CHORUS_TEXT = "Eu sou uma Metralhadora em estado de Graça"
@@ -359,6 +360,8 @@ class App:
                     raise SorterError("err.usage", usage=f"testvoice <team> ({', '.join(s.teams)})")
                 name = render(f"team.{team}", None, lang)
                 phrase = self.tts_cfg.get("test_phrase")  # set in config.toml: said as written
+                if phrase == LEGACY_TEST_PHRASE:
+                    phrase = None  # the old default, copied into every config.toml: not a choice, follow the language
                 phrase = phrase.replace("{team}", team) if phrase else render("testvoice.phrase", {"team": name}, lang)
                 ok = await self.say(f"{render('test.label', None, lang)} {name}", phrase, team=team)
                 return Message("msg.testvoice", {"team": team}) if ok else Message("msg.testvoice_full")
