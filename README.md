@@ -19,8 +19,10 @@ one with **Language** at the top right of the panel (until you do, it follows yo
 
 ## Download and install
 
-1. Download the `.msi` installer from the [releases page](https://github.com/NegentropyBeing/goblin-yapper/releases/latest).
-2. Run it. The installer is unsigned, so Windows SmartScreen may warn you: click **More info → Run anyway**. The installer itself is in Portuguese only, for now.
+1. Download the `.msi` installer in your language from the [releases page](https://github.com/NegentropyBeing/goblin-yapper/releases/latest):
+   `…_x64_en-US.msi` (English) or `…_x64_pt-BR.msi` (Portuguese). Both install the same app; the file only sets the
+   language of the installer itself. The app's language is chosen separately, in the panel.
+2. Run it. The installer is unsigned, so Windows SmartScreen may warn you: click **More info → Run anyway**.
 
 Requirements:
 - Windows 10 or 11 (64-bit).

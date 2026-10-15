@@ -37,7 +37,7 @@
     "externalBin": ["binaries/goblin-yapper-server"],
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },
-      "wix": { "language": "pt-BR" }
+      "wix": { "language": ["en-US", "pt-BR"] }
     }
   }
 }
