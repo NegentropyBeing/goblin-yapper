@@ -640,3 +640,31 @@ def test_chorus_every_team_voice_says_the_phrase_together():
         worker.cancel()
 
     asyncio.run(run())
+
+
+def test_voice_reports_who_lost_it_from_every_mutating_call():
+    v = VoiceController(sorter(2, 6), random.Random(1))
+    v.sorter.sort()
+    first = v.pick_random("any")
+    assert v.take_lost() == set()
+    second = v.give("alguem")  # single mode: giving the voice takes it from the first speaker
+    assert v.take_lost() == {first}
+    assert v.take_lost() == set()  # cleared once taken
+    v.prune(lambda u: u != second)
+    assert v.take_lost() == {second}
+    v.give("x")
+    v.stop()
+    assert v.take_lost() == {"x"}
+
+
+def test_voice_picking_the_same_speaker_again_is_not_a_loss_and_multi_off_reports_the_dropped():
+    s = sorter(2, 2)  # one chatter per team: the pick can only land on the same person
+    s.sort()
+    v = VoiceController(s, random.Random(1), multi=True)
+    a, b = v.pick_random("azul"), v.pick_random("verde")
+    v.take_lost()
+    assert v.pick_random("azul") == a and v.take_lost() == set()
+    v.set_multi(False)
+    assert v.users == [a] and v.take_lost() == {b}
+    v.give(b)
+    assert v.take_lost() == {a}

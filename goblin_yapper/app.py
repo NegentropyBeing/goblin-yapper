@@ -260,7 +260,6 @@ class App:
     async def tick(self) -> None:
         """Inactive chatters leave the queue/teams; a speaker's time with the voice runs out."""
         now, s, v = self.now(), self.sorter, self.voice
-        before = set(v.users)
         members = [*s.queue, *(u for m in s.teams.values() for u in m)]
         # people added by hand (or from before a reconnect) count from the moment they are first seen here
         self.last_seen = {u: self.last_seen.get(u, now) for u in members}
@@ -289,7 +288,7 @@ class App:
                 self.voice_since[new] = now
                 if new != u:
                     notices.append(f"voz do time {team} passou para {s.name(new)}")
-        if lost := before - set(v.users):
+        if lost := v.take_lost():
             await self.interrupt(lost)
         if notices:
             log.info("; ".join(notices))
@@ -362,7 +361,6 @@ class App:
                 self.persist({"tts": {"engine": self.tts.engine.name}})
                 await self.broadcast(self.state())
                 return f"TTS: {self.tts.engine.name}"
-            before = set(v.users)
             out = self._mutate(cmd, args, s, v)
             # A speaker removed from the game loses the voice too.
             if cmd == "remove":
@@ -371,7 +369,7 @@ class App:
                 v.prune(lambda u: s.where(u) is not None)
             if cmd == "stop" and not args:
                 await self.interrupt()  # everything, including test lines
-            elif lost := before - set(v.users):
+            elif lost := v.take_lost():
                 await self.interrupt(lost)  # only the speakers who lost the voice
             await self.broadcast(self.state())
             return out

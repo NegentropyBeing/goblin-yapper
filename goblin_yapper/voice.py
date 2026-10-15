@@ -27,6 +27,7 @@ class VoiceController:
         self.rng = rng or random.Random()
         self.multi = multi
         self.users: list[str] = []  # speakers, oldest first
+        self._lost: set[str] = set()  # who lost the voice since take_lost() was last called
         self.last_team: str | None = None
 
     # ---- queries -------------------------------------------------------
@@ -51,6 +52,12 @@ class VoiceController:
 
     def speakers(self) -> list[tuple[str, str | None]]:
         return [(u, self.sorter.team_of(u)) for u in self.users]
+
+    def take_lost(self) -> set[str]:
+        """Everyone who lost the voice (and did not get it back) since the last call: stopped, replaced,
+        pruned, or dropped by turning multi off. The caller cuts their speech."""
+        lost, self._lost = self._lost, set()
+        return lost
 
     # ---- actions -------------------------------------------------------
 
@@ -82,6 +89,7 @@ class VoiceController:
         """Stop everyone (None), one team's speaker, or one chatter. Returns who lost the voice."""
         if target is None:
             removed, self.users = self.users, []
+            self._lost.update(removed)
             return removed
         target = target.lower()
         if target in self.sorter.teams:
@@ -91,6 +99,7 @@ class VoiceController:
         else:
             raise SorterError(f"{target} não tem a voz")
         self.users = [u for u in self.users if u not in removed]
+        self._lost.update(removed)
         return removed
 
     def set_multi(self, on: bool) -> list[str]:
@@ -99,21 +108,26 @@ class VoiceController:
         if on or len(self.users) <= 1:
             return []
         removed, self.users = self.users[:-1], self.users[-1:]
+        self._lost.update(removed)
         return removed
 
     def prune(self, keep) -> list[str]:
         """Drop speakers for whom keep(user) is False (e.g. removed from the game)."""
         removed = [u for u in self.users if not keep(u)]
         self.users = [u for u in self.users if keep(u)]
+        self._lost.update(removed)
         return removed
 
     def _set(self, user: str) -> str:
         team = self.sorter.team_of(user)
+        before = self.users
         if self.multi:
             # one speaker per team: replace that team's current speaker
             self.users = [u for u in self.users if u != user and self.sorter.team_of(u) != team]
         else:
             self.users = []
+        self._lost.update(u for u in before if u not in self.users)
+        self._lost.discard(user)  # got it (back) right away: not a loss
         self.users.append(user)
         self.last_team = team or self.last_team
         return user
