@@ -164,7 +164,7 @@ def make_app(srv: TTSServer) -> web.Application:
     async def transcribe(request):
         d = draft_dir(request.match_info["draft"])
         t = time.time()
-        text = await srv.gpu("transcrevendo", srv.engine.transcribe, d / "reference.wav")
+        text = await srv.gpu("transcribing", srv.engine.transcribe, d / "reference.wav")
         srv.schedule_asr_release()
         return web.json_response({"text": text, "seconds": round(time.time() - t, 2)})
 
@@ -174,7 +174,7 @@ def make_app(srv: TTSServer) -> web.Application:
         d = draft_dir(str(body.get("draft_id", "")))
 
         async def build(wav, ref_text, cache):
-            await srv.gpu("criando perfil", srv.engine.build_profile, wav, ref_text, cache)
+            await srv.gpu("creating profile", srv.engine.build_profile, wav, ref_text, cache)
 
         try:
             meta = await srv.profiles.create(d, str(body.get("name", "")), str(body.get("ref_text", "")),
@@ -183,7 +183,7 @@ def make_app(srv: TTSServer) -> web.Application:
             raise
         except Exception as e:
             log.exception("failed to create the profile")
-            raise web.HTTPInternalServerError(text=f"falha ao criar perfil: {e}")
+            raise web.HTTPInternalServerError(text=f"failed to create the profile: {e}")
         log.info("profile created: %s (%s)", meta["name"], meta["id"])
         if srv._asr_timer:  # the draft is done with Whisper: don't hold its VRAM for the idle timeout
             await srv.release_asr_now()
@@ -205,7 +205,7 @@ def make_app(srv: TTSServer) -> web.Application:
     @routes.patch("/profiles/{id}")
     async def update_profile(request):
         async def build(wav, ref_text, cache):
-            await srv.gpu("recriando perfil", srv.engine.build_profile, wav, ref_text, cache)
+            await srv.gpu("recreating profile", srv.engine.build_profile, wav, ref_text, cache)
 
         return web.json_response(await srv.profiles.update(request.match_info["id"], await request.json(), build))
 
@@ -228,7 +228,7 @@ def make_app(srv: TTSServer) -> web.Application:
         # "global_params" previews unsaved global settings: they sit below the profile's own params.
         params = srv.params.resolve(body.get("global_params") or {}, profile_params, body.get("params") or {})
         t = time.time()
-        samples = await srv.gpu("gerando fala", srv.engine.synthesize, text, cache, params)
+        samples = await srv.gpu("generating speech", srv.engine.synthesize, text, cache, params)
         gen = time.time() - t
         dur = len(samples) / srv.engine.sample_rate
         log.info("speech: %.2fs of audio in %.2fs (%s)", dur, gen, body.get("profile") or "no profile")

@@ -413,7 +413,7 @@ function connect() {
       setTalking(); renderLine();
     }
     else if (msg.type === "assets") loadAssets();
-    else if (msg.type === "notice") toast(msg.key ? i18n.fromServer(msg) : msg.text, !msg.ok);
+    else if (msg.type === "notice") toast(msg.items ? msg.items.map(i18n.fromServer).join("; ") : msg.key ? i18n.fromServer(msg) : msg.text, !msg.ok);
   };
   ws.onclose = () => {
     // their "idle" would be missed while offline
