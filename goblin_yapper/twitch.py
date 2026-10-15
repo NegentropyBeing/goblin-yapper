@@ -44,7 +44,7 @@ def parse_line(line: str) -> tuple[dict[str, str], str, str, list[str]]:
 
 async def read_chat(channel: str, on_status: Callable[[str], None] = lambda s: None) -> AsyncIterator[ChatMessage]:
     """Yields chat messages forever, reconnecting with backoff.
-    on_status gets 'conectado' once the channel is joined and 'reconectando' on drops."""
+    on_status gets 'connected' once the channel is joined and 'reconnecting' on drops."""
     channel = channel.lower().lstrip("#")
     backoff = 1
     while True:
@@ -56,12 +56,12 @@ async def read_chat(channel: str, on_status: Callable[[str], None] = lambda s: N
                 f"CAP REQ :twitch.tv/tags twitch.tv/commands\r\nPASS SCHMOOPIIE\r\nNICK {nick}\r\nJOIN #{channel}\r\n".encode()
             )
             await writer.drain()
-            log.info("conectado ao chat de #%s como %s", channel, nick)
+            log.info("connected to the chat of #%s as %s", channel, nick)
             backoff = 1
             while True:
                 raw = await asyncio.wait_for(reader.readline(), timeout=360)
                 if not raw:
-                    raise ConnectionError("conexão fechada")
+                    raise ConnectionError("connection closed")
                 line = raw.decode("utf-8", "replace").rstrip("\r\n")
                 if not line:
                     continue
@@ -70,9 +70,9 @@ async def read_chat(channel: str, on_status: Callable[[str], None] = lambda s: N
                     writer.write(f"PONG :{params[-1] if params else 'tmi.twitch.tv'}\r\n".encode())
                     await writer.drain()
                 elif command == "ROOMSTATE":
-                    on_status("conectado")
+                    on_status("connected")
                 elif command == "RECONNECT":
-                    raise ConnectionError("servidor pediu reconexão")
+                    raise ConnectionError("server asked to reconnect")
                 elif command == "PRIVMSG" and len(params) >= 2:
                     login = prefix.split("!", 1)[0]
                     text = params[-1]
@@ -80,8 +80,8 @@ async def read_chat(channel: str, on_status: Callable[[str], None] = lambda s: N
                         text = text[8:-1]
                     yield ChatMessage(login, tags.get("display-name") or login, text, tags)
         except (OSError, ConnectionError, asyncio.TimeoutError) as e:
-            log.warning("chat desconectado (%s); reconectando em %ss", e, backoff)
-            on_status("reconectando")
+            log.warning("chat disconnected (%s); reconnecting in %ss", e, backoff)
+            on_status("reconnecting")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 60)
         finally:

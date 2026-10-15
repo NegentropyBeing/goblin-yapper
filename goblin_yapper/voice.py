@@ -74,11 +74,11 @@ class VoiceController:
             candidates = list(self.sorter.teams[team])
             current = self.speaker_of(team)
         else:
-            raise SorterError(f"time desconhecido: {team}")
+            raise SorterError("err.unknown_team", team=team)
         if len(candidates) > 1 and current in candidates:
             candidates.remove(current)  # "sorteia OUTRA pessoa"
         if not candidates:
-            raise SorterError("ninguém para sortear" + ("" if team == ANY else f" no time {team}"))
+            raise SorterError("err.nobody_to_pick") if team == ANY else SorterError("err.nobody_to_pick_team", team=team)
         return self._set(self.rng.choice(candidates))
 
     def give(self, user: str) -> str:
@@ -97,7 +97,7 @@ class VoiceController:
         elif target in self.users:
             removed = [target]
         else:
-            raise SorterError(f"{target} não tem a voz")
+            raise SorterError("err.no_voice", target=target)
         self.users = [u for u in self.users if u not in removed]
         self._lost.update(removed)
         return removed

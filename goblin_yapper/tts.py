@@ -140,7 +140,7 @@ class ServerEngine(Engine):
         except urllib.error.HTTPError as e:
             raise RuntimeError(e.read().decode("utf-8", "replace") or f"HTTP {e.code}") from None
         except urllib.error.URLError as e:
-            raise RuntimeError(f"servidor TTS fora do ar ({e.reason})") from None
+            raise RuntimeError(f"TTS server is down ({e.reason})") from None
 
 
 class CustomEngine(Engine):
@@ -199,7 +199,7 @@ class Synthesizer:
 
     def _make(self, name: str) -> Engine:
         if name not in ENGINES:
-            raise ValueError(f"engine TTS desconhecida: {name} (opções: {', '.join(ENGINES)})")
+            raise ValueError(f"unknown TTS engine: {name} (options: {', '.join(ENGINES)})")
         return ENGINES[name](self.cfg.get(name, {}))
 
     def set_team_profile(self, team: str, profile: str | None) -> None:
@@ -219,7 +219,7 @@ class Synthesizer:
         async with self._lock:
             await asyncio.to_thread(engine.load)
             self.engine, self.error = engine, None
-        log.info("TTS trocado para %s", name)
+        log.info("TTS switched to %s", name)
 
     def voice_for(self, team: str | None) -> dict:
         voice = {**self.voices.get("default", {}), **self.voices.get(team or "", {})}
@@ -233,10 +233,10 @@ class Synthesizer:
             await asyncio.to_thread(self.engine.load)
         except Exception as e:
             # e.g. a custom engine whose dependencies are missing: keep running with a basic voice.
-            log.exception("falha ao carregar TTS %s; usando voz reserva", self.engine.name)
+            log.exception("failed to load TTS %s; using the fallback voice", self.engine.name)
             self.error = f"{self.engine.name}: {e}"
             self.engine = (SapiEngine if sys.platform == "win32" else DummyEngine)(self._fallback_cfg)
-        log.info("TTS pronto (engine=%s)", self.engine.name)
+        log.info("TTS ready (engine=%s)", self.engine.name)
 
     async def start(self) -> None:
         """Load the engine, then start the TTS server if it is set to autostart."""

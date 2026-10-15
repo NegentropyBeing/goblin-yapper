@@ -5,6 +5,7 @@ import random
 import pytest
 
 from goblin_yapper.app import CHORUS_TEXT, CHORUS_TRIGGER, App, strip_emotes
+from goblin_yapper.i18n import Message
 from goblin_yapper.teams import QUEUE, SorterError, TeamSorter
 from goblin_yapper.tts import TTS, wav_duration
 from goblin_yapper.twitch import ChatMessage, parse_line
@@ -124,7 +125,7 @@ def test_dummy_tts_produces_wav():
 def test_app_flow():
     async def run():
         app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
-        assert "fila aberta" in await app.command("open")
+        assert (await app.command("open")).key == "msg.queue_open"
         for name in ("ana", "bia", "caio", "duda"):
             await app.on_chat(ChatMessage(name, name.title(), "!joinsort", {}))
         assert len(app.sorter.queue) == 4
@@ -132,7 +133,7 @@ def test_app_flow():
         assert sizes(app.sorter) == [2, 2]
         out = await app.command("voice azul")
         speaker = app.voice.active
-        assert "voz para" in out and app.voice.active_team == "azul"
+        assert out.key == "msg.voice_to" and app.voice.active_team == "azul"
         await app.on_chat(ChatMessage(speaker, speaker, "oi chat https://x.com", {}))
         await app.on_chat(ChatMessage(speaker, speaker, "!comando", {}))
         other = next(u for u in ("ana", "bia", "caio", "duda") if u != speaker)
@@ -142,7 +143,7 @@ def test_app_flow():
         assert utt.text == "oi chat" and utt.team == "azul"
         await app.command(f"remove {speaker}")
         assert app.voice.active is None
-        assert (await app.command("bogus")).startswith("erro")
+        assert not (await app.command("bogus")).ok
 
     asyncio.run(run())
 
@@ -153,12 +154,13 @@ def test_tint_config_and_command():
                   TTS({"engine": "dummy"}))
         assert app.tints["azul"] == {"color": "#000001", "strength": 0.3}
         assert app.tints["verde"]["color"] == "#000002"
-        assert "força 0.70" in await app.command("tint roxo #112233 0.7")
+        tinted = await app.command("tint roxo #112233 0.7")
+        assert (tinted.key, tinted.params["strength"]) == ("msg.tint", "0.70")
         assert app.state()["tints"]["roxo"] == {"color": "#112233", "strength": 0.7}
         await app.command("tint roxo off")
         assert app.tints["roxo"]["strength"] == 0
-        assert (await app.command("tint roxo vermelho")).startswith("erro")
-        assert (await app.command("tint laranja #112233")).startswith("erro")
+        assert not (await app.command("tint roxo vermelho")).ok
+        assert not (await app.command("tint laranja #112233")).ok
 
     asyncio.run(run())
 
@@ -172,9 +174,10 @@ def test_channel_normalization():
 
     async def run():
         app = App({}, TTS({"engine": "dummy"}))
-        assert (await app.command("channel https://www.twitch.tv/negentropybeing")) == "chat: #negentropybeing"
+        chat = await app.command("channel https://www.twitch.tv/negentropybeing")
+        assert (chat.key, chat.params) == ("msg.chat_on", {"channel": "negentropybeing"})
         assert app.config.settings["twitch"]["channel"] == "negentropybeing"
-        assert (await app.command("channel não-é-canal!")).startswith("erro")
+        assert not (await app.command("channel não-é-canal!")).ok
         assert app.channel == "negentropybeing"  # unchanged after a bad name
         await app.command("channel off")
 
@@ -195,7 +198,8 @@ def test_join_while_closed_sends_notice():
         app.clients.add(ws)
         await app.on_chat(ChatMessage("ana", "Ana", "!joinsort", {}))
         assert app.sorter.queue == []
-        assert ws.sent == [{"type": "notice", "text": "Ana tentou entrar, mas a fila está fechada"}]
+        assert ws.sent == [{"type": "notice", "key": "notice.queue_closed", "params": {"user": "Ana"},
+                            "text": "Ana tried to join, but the queue is closed"}]
         await app.command("open")
         await app.on_chat(ChatMessage("ana", "Ana", "!JoinSorting", {}))
         assert app.sorter.queue == ["ana"]
@@ -217,18 +221,20 @@ def test_teamvoice_and_engine_commands(tmp_path):
     async def run():
         settings = tmp_path / "settings.json"
         app = App({}, TTS({"engine": "dummy"}), settings_path=settings)
-        assert (await app.command("teamvoice azul goblin-azul-1")) == "voz de azul: goblin-azul-1"
+        voice = await app.command("teamvoice azul goblin-azul-1")
+        assert (voice.key, voice.params) == ("msg.team_voice", {"team": "azul", "profile": "goblin-azul-1"})
         await app.command("teamvoice default narrador-2")
         assert app.tts.voice_for("azul")["profile"] == "goblin-azul-1"
         assert app.tts.voice_for("verde")["profile"] == "narrador-2"  # falls back to default
         await app.command("teamvoice azul none")
         assert "azul" not in app.tts.team_profiles
         assert json.loads(settings.read_text(encoding="utf-8"))["tts"]["team_profiles"] == {"default": "narrador-2"}
-        assert (await app.command("teamvoice laranja x")).startswith("erro")
+        assert not (await app.command("teamvoice laranja x")).ok
 
-        assert (await app.command("engine sapi")) == "TTS: sapi"
+        engine = await app.command("engine sapi")
+        assert (engine.key, engine.params) == ("msg.engine", {"engine": "sapi"})
         assert app.tts.engine.name == "sapi"
-        assert (await app.command("engine nope")).startswith("erro")
+        assert not (await app.command("engine nope")).ok
         assert app.tts.engine.name == "sapi"  # unchanged after a bad name
 
         # saved team voices come back on restart
@@ -283,7 +289,7 @@ def test_multi_mode_one_speaker_per_team():
         assert [u.user for u in app.speech.queue._queue] == [speakers["verde"]]
 
         # stop one team, then everyone
-        assert (await app.command("stop verde")).startswith("voz retirada de")
+        assert (await app.command("stop verde")).key == "msg.voice_removed"
         assert [t for _, t in app.voice.speakers()] == ["azul"]
         await app.command("stop")
         assert app.voice.speakers() == [] and app.speech.queue.qsize() == 0
@@ -309,7 +315,7 @@ def test_multivoice_toggle_and_per_speaker_queue_limit(tmp_path):
         await app.command("multivoice off")  # keeps only the most recent speaker
         assert app.voice.users == ["v1"]
         assert [u.user for u in app.speech.queue._queue] == ["v1"]
-        assert (await app.command("multivoice talvez")).startswith("erro")
+        assert not (await app.command("multivoice talvez")).ok
 
     asyncio.run(run())
 
@@ -368,7 +374,8 @@ def test_no_audio_overlay_gives_a_notice():
     app, s = _app_with_overlays(azul=("azul", True))
     _run_one_line(app, "verde")  # verde has no source and there is no main one
     assert [m["play"] for m in s["azul"].sent if m["type"] == "speak"] == [False]
-    assert any(m["type"] == "notice" and "verde" in m["text"] for m in s["panel"].sent)
+    assert any(m["type"] == "notice" and (m["key"], m["params"]) == ("notice.no_overlay_team", {"team": "verde"})
+               for m in s["panel"].sent)
 
 
 def test_panel_is_the_last_resort_player():
@@ -386,12 +393,12 @@ def test_testvoice_uses_the_team_phrase_and_profile():
     async def run():
         app = App({"teams": {"count": 2}, "tts": {"test_phrase": "Oi, time {team}!"}}, TTS({"engine": "dummy"}))
         await app.command("teamvoice verde goblin-verde-1")
-        assert (await app.command("testvoice verde")) == "testando a voz do time verde"
+        assert (await app.command("testvoice verde")).key == "msg.testvoice"
         utt = app.speech.queue.get_nowait()
         assert (utt.text, utt.team, utt.chat) == ("Oi, time verde!", "verde", False)
         assert app.tts.voice_for(utt.team)["profile"] == "goblin-verde-1"
-        assert (await app.command("testvoice roxo")).startswith("erro")  # only 2 teams active
-        assert (await app.command("testvoice")).startswith("erro")
+        assert not (await app.command("testvoice roxo")).ok  # only 2 teams active
+        assert not (await app.command("testvoice")).ok
 
     asyncio.run(run())
 
@@ -401,7 +408,7 @@ def _game(cfg=None, people=("ana", "bia", "caio", "duda")):
     app = App({"teams": {"count": 2}, **(cfg or {})}, TTS({"engine": "dummy"}))
     app.clock = [0.0]
     app.now = lambda: app.clock[0]
-    app.chat_status = "conectado"
+    app.chat_status = "connected"
     app.sorter.queue_open = True
     return app, people
 
@@ -418,19 +425,19 @@ def test_inactive_chatters_are_removed_after_the_limit(tmp_path):
         app.clock[0] = 11 * 60
         await app.tick()
         assert len(app.sorter.queue) == 4  # off by default
-        assert (await app.command("autoremove on 10")) == "inativos saem após 10 min sem falar no chat"
+        assert (await app.command("autoremove on 10")).params == {"minutes": "10"}
         assert app.state()["auto_remove"] == {"on": True, "minutes": 10.0}
         saved = json.loads(app.config.settings_path.read_text(encoding="utf-8"))["teams"]
         assert saved == {"inactive_remove": True, "inactive_minutes": 10.0}
-        app.chat_status = "reconectando"
+        app.chat_status = "reconnecting"
         await app.tick()
         assert len(app.sorter.queue) == 4  # the chat is down: nobody can be heard, nobody is removed
-        app.chat_status = "conectado"
+        app.chat_status = "connected"
         await app.tick()
         assert app.sorter.queue == ["ana"]  # only the one who wrote in the last 10 minutes stays
-        assert (await app.command("autoremove on zero")).startswith("erro")
-        assert (await app.command("autoremove")).startswith("erro")
-        assert (await app.command("autoremove off")) == "remoção de inativos desligada"
+        assert not (await app.command("autoremove on zero")).ok
+        assert not (await app.command("autoremove")).ok
+        assert (await app.command("autoremove off")).key == "msg.autoremove_off"
         app.clock[0] = 60 * 60
         await app.tick()
         assert app.sorter.queue == ["ana"]
@@ -444,7 +451,7 @@ def test_reconnecting_restarts_the_inactivity_clocks():
         await app.command("add ana")
         await app.tick()
         app.clock[0] = 20 * 60
-        app.last_seen.clear()  # what _set_chat_status("conectado") does
+        app.last_seen.clear()  # what _set_chat_status("connected") does
         await app.tick()
         assert app.sorter.queue == ["ana"]
         app.clock[0] = 26 * 60
@@ -466,7 +473,7 @@ def test_voice_rotates_inside_the_team_after_the_limit():
         app.clock[0] = 6 * 60
         await app.tick()
         assert app.voice.active == first  # off by default
-        assert (await app.command("autorotate on 5")) == "a voz troca de pessoa a cada 5 min"
+        assert (await app.command("autorotate on 5")).params == {"minutes": "5"}
         app.speech.speaking = type("U", (), {"user": first, "id": 1, "team": "azul"})()  # their line is playing: wait
         await app.tick()
         assert app.voice.active == first
@@ -537,12 +544,12 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
         ws = FakeWS()
         app.clients.add(ws)
         worker = asyncio.create_task(app.speech.run())
-        assert (await app.command("skip")).startswith("erro")  # nothing in progress
+        assert not (await app.command("skip")).ok  # nothing in progress
         await app.say("ana", "travada")
         await app.say("bia", "segunda")
         await _until(lambda: app.speech.generating is not None and engine.calls)
         assert app.state()["generating"] == {"user": "ana", "team": None}
-        assert "pulada" in await app.command("skip")
+        assert (await app.command("skip")).key == "msg.skipped_generating"
         spoken = lambda: [m["text"] for m in ws.sent if m["type"] == "speak"]  # noqa: E731
         if reentrant:
             await _until(lambda: spoken() == ["segunda"])  # went on although the first call is still hanging
@@ -554,7 +561,7 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
             await _until(lambda: spoken() == ["segunda"])
         # skipping a line that is playing ends it and tells the players to stop
         speak = next(m for m in ws.sent if m["type"] == "speak")
-        assert "pulada" in await app.command("skip")
+        assert (await app.command("skip")).key == "msg.skipped"
         await _until(lambda: app.speech.speaking is None)
         assert {"type": "stop", "id": speak["id"]} in ws.sent
         engine.release.set()
@@ -583,14 +590,14 @@ def test_hideidle_toggle_is_saved_and_sent_to_overlays(tmp_path):
         settings = tmp_path / "settings.json"
         app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}), settings_path=settings)
         assert app.state()["hide_idle"] is False  # off by default
-        assert not (await app.command("hideidle on")).startswith("erro")
+        assert not not (await app.command("hideidle on")).ok
         assert app.state()["hide_idle"] is True
         assert json.loads(settings.read_text(encoding="utf-8"))["overlay"] == {"hide_idle": True}
         # kept on the next start
         assert App({}, TTS({"engine": "dummy"}), settings_path=settings).state()["hide_idle"] is True
         await app.command("hideidle off")
         assert app.state()["hide_idle"] is False
-        assert (await app.command("hideidle")).startswith("erro")
+        assert not (await app.command("hideidle")).ok
 
     asyncio.run(run())
 
@@ -634,7 +641,7 @@ def test_chorus_every_team_voice_says_the_phrase_together():
         await _until(lambda: len(app.speech.playing) == 2)
         assert len(calls) == 2  # one clip per team, even with the same voice settings
         ids = [u.id for u in app.speech.playing]
-        assert not (await app.command("skip")).startswith("erro")
+        assert not not (await app.command("skip")).ok
         await _until(lambda: app.speech.speaking is None)
         assert [m["id"] for m in s["panel"].sent if m["type"] == "stop"] == ids
         worker.cancel()
@@ -668,3 +675,42 @@ def test_voice_picking_the_same_speaker_again_is_not_a_loss_and_multi_off_report
     assert v.users == [a] and v.take_lost() == {b}
     v.give(b)
     assert v.take_lost() == {a}
+
+
+def test_interface_language_is_validated_stored_and_survives_a_restart(tmp_path):
+    async def run():
+        path = tmp_path / "settings.json"
+        app = App({}, TTS({"engine": "dummy"}), path)
+        assert app.state()["language"] is None  # no choice yet: the panel follows the system
+        await app.command("language pt-BR")
+        assert app.state()["language"] == "pt-BR"
+        await app.command("language klingon")
+        assert app.state()["language"] == "pt-BR"  # a language we have no catalog for is refused
+        assert json.loads(path.read_text(encoding="utf-8"))["ui"]["language"] == "pt-BR"
+        await app.command("language en")
+        assert App({}, TTS({"engine": "dummy"}), path).state()["language"] == "en"
+
+    asyncio.run(run())
+
+
+def test_commands_answer_with_a_key_and_values_never_with_text():
+    async def run():
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
+        for line, key, params in [
+            ("tint laranja #112233", "err.unknown_team", {"team": "laranja"}),
+            ("teams x", "err.usage", {"usage": "teams <1-4>"}),
+            ("bogus", "err.unknown_command", {"command": "bogus"}),
+            ("remove ninguem", "err.not_in_game", {"user": "ninguem"}),
+            ("language klingon", "err.usage", {"usage": "language <en|pt-BR>"}),
+        ]:
+            reply = await app.command(line)
+            assert (reply.key, reply.params, reply.ok) == (key, params, False), line
+
+    asyncio.run(run())
+
+
+def test_a_reply_renders_in_english_for_the_console_and_the_api():
+    assert str(Message("msg.queue_open")) == "queue open"
+    assert str(Message("err.unknown_team", {"team": "laranja"}, ok=False)) == "error: unknown team: laranja"
+    assert str(Message("msg.tint", {"team": "azul", "color": "#fff", "strength": "0.70"})) == "azul tint: #fff strength 0.70"
+    assert str(Message("no.such.key")) == "no.such.key"

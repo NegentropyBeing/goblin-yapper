@@ -30,6 +30,7 @@ import aiohttp
 from aiohttp import WSMsgType, web
 
 from .app import App
+from .i18n import MessageError, render
 from .teams import TEAM_NAMES
 
 log = logging.getLogger(__name__)
@@ -37,6 +38,16 @@ log = logging.getLogger(__name__)
 WEB_DIR = Path(__file__).resolve().parent / "web"
 ASSET_FILES = {f"{stem}.{ext}" for stem in ("goblin", *TEAM_NAMES) for ext in ("png", "gif")}
 MAX_ASSET_BYTES = 20 * 1024 * 1024
+
+
+def fail(error_class, key_or_error, **params):
+    """An HTTP error whose body is a message (key + values) the panel puts in its language."""
+    if isinstance(key_or_error, MessageError):
+        key, params = key_or_error.message.key, key_or_error.message.params
+    else:
+        key = key_or_error
+    body = {"key": key, "params": params, "text": render(key, params)}
+    return error_class(text=json.dumps(body), content_type="application/json")
 
 
 def find_assets(assets_dir: Path) -> dict:
@@ -83,16 +94,16 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
     def asset_path(request) -> Path:
         name = request.match_info["name"].lower()
         if name not in ASSET_FILES:
-            raise web.HTTPBadRequest(text=f"nome inválido; use um de: {', '.join(sorted(ASSET_FILES))}")
+            raise fail(web.HTTPBadRequest, "http.bad_asset_name", allowed=", ".join(sorted(ASSET_FILES)))
         return assets_dir / name
 
     async def upload_asset(request):
         path = asset_path(request)
         data = await request.read()
         if not data or len(data) > MAX_ASSET_BYTES:
-            raise web.HTTPBadRequest(text="arquivo vazio ou maior que 20MB")
+            raise fail(web.HTTPBadRequest, "http.asset_too_big")
         if not (data.startswith(b"\x89PNG") if path.suffix == ".png" else data[:4] == b"GIF8"):
-            raise web.HTTPBadRequest(text=f"o arquivo não é um {path.suffix[1:].upper()} válido")
+            raise fail(web.HTTPBadRequest, "http.asset_not_image", kind=path.suffix[1:].upper())
         path.write_bytes(data)
         await app.broadcast({"type": "assets"})
         return web.json_response({"ok": True})
@@ -106,9 +117,9 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         try:
             body = await request.json()
         except ValueError:
-            raise web.HTTPBadRequest(text="JSON inválido; esperado {\"command\": \"...\"}")
-        output = await app.command(str(body.get("command", "")))
-        return web.json_response({"output": output, "state": app.state()})
+            raise fail(web.HTTPBadRequest, "http.bad_json")
+        reply = await app.command(str(body.get("command", "")))
+        return web.json_response({**reply.payload(), "state": app.state()})
 
     async def ws_handler(request):
         ws = web.WebSocketResponse(heartbeat=20)
@@ -137,7 +148,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
 
     def service():
         if app.tts.service is None:
-            raise web.HTTPServiceUnavailable(text="servidor TTS desativado")
+            raise fail(web.HTTPServiceUnavailable, "http.tts_disabled")
         return app.tts.service
 
     async def tts_service_status(_):
@@ -151,7 +162,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
             try:
                 await getattr(svc, method)()
             except RuntimeError as e:
-                raise web.HTTPConflict(text=str(e))
+                raise fail(web.HTTPConflict, e) if isinstance(e, MessageError) else web.HTTPConflict(text=str(e))
             return web.json_response(await svc.status())
         return handler
 
@@ -160,13 +171,13 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         try:
             svc.install()
         except RuntimeError as e:
-            raise web.HTTPConflict(text=str(e))
+            raise fail(web.HTTPConflict, e) if isinstance(e, MessageError) else web.HTTPConflict(text=str(e))
         return web.json_response(await svc.status())
 
     async def tts_proxy(request):
         svc = app.tts.service
         if svc is None or svc.session is None:
-            raise web.HTTPServiceUnavailable(text="servidor TTS desativado")
+            raise fail(web.HTTPServiceUnavailable, "http.tts_disabled")
         url = f"{svc.url}/{request.match_info['tail']}"
         headers = {k: v for k, v in request.headers.items() if k.lower() == "content-type"}
         try:
@@ -176,7 +187,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
                 out = {k: v for k, v in r.headers.items() if k.lower() == "content-type" or k.lower().startswith("x-")}
                 return web.Response(body=body, status=r.status, headers=out)
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            raise web.HTTPServiceUnavailable(text=f"servidor TTS fora do ar ({type(e).__name__})")
+            raise fail(web.HTTPServiceUnavailable, "http.tts_down", error=type(e).__name__)
 
     wa = web.Application(client_max_size=60 * 1024 * 1024)
     wa.add_routes([

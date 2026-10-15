@@ -21,12 +21,17 @@ from urllib.parse import urlparse
 
 import aiohttp
 
+from .i18n import MessageError
 from .tts import DEFAULT_SERVER_URL
 from .tts_install import VoiceInstaller
 
 log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+class ServiceError(MessageError, RuntimeError):
+    """The operator asked for something the voice server can't do right now."""
 
 
 class TTSService:
@@ -70,11 +75,11 @@ class TTSService:
             return  # already on
         if await self._alive():
             self.mode = "external"
-            log.info("servidor TTS já rodando em %s; usando ele", self.url)
+            log.info("TTS server already running at %s; using it", self.url)
             return
         if not self.installed:
             self.mode = "not_installed"
-            log.warning("servidor de voz não instalado; instale pela aba Voz (ou rode tts_server\\setup.ps1)")
+            log.warning("voice server not installed; install it from the Voice tab (or run tts_server\\setup.ps1)")
             return
         if self.uses_runtime:
             self.installer.sync_server_code()  # the runtime gets this app version's server code
@@ -88,14 +93,14 @@ class TTSService:
                 stdout=subprocess.DEVNULL, stderr=err,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.mode = "managed"
-        log.info("servidor TTS iniciado (pid %s), log em %s", self.proc.pid, self.data_dir / "tts-server.log")
+        log.info("TTS server started (pid %s), log at %s", self.proc.pid, self.data_dir / "tts-server.log")
         asyncio.get_running_loop().create_task(self._watch(self.proc))
 
     async def _watch(self, proc) -> None:
         code = await proc.wait()
         if proc is self.proc:
             self.mode = "exited"
-            log.warning("servidor TTS encerrou (código %s); veja %s", code, self.data_dir / "tts-server.log")
+            log.warning("TTS server exited (code %s); see %s", code, self.data_dir / "tts-server.log")
             self._copy_crash_to_log()
 
     def _copy_crash_to_log(self) -> None:
@@ -104,7 +109,7 @@ class TTSService:
             tail = self.stderr_path.read_text(encoding="utf-8", errors="replace").strip()[-4000:]
             if tail:
                 with open(self.data_dir / "tts-server.log", "a", encoding="utf-8") as f:
-                    f.write(f"\n--- o servidor encerrou; saída de erro ---\n{tail}\n")
+                    f.write(f"\n--- the server exited; error output ---\n{tail}\n")
         except OSError:
             pass
 
@@ -117,16 +122,16 @@ class TTSService:
 
     async def restart(self) -> None:
         if self.mode == "external":
-            raise RuntimeError("o servidor TTS foi iniciado fora do app; reinicie-o por lá")
+            raise ServiceError("tts.external_restart")
         await self.stop()
         await self.start()
 
     async def turn_off(self) -> None:
         """Unload the model: ending the server process is what gives all its VRAM back."""
         if self.mode == "external":
-            raise RuntimeError("o servidor TTS foi iniciado fora do app; desligue-o por lá")
+            raise ServiceError("tts.external_stop")
         await self.stop()
-        log.info("servidor TTS desligado pelo painel")
+        log.info("TTS server turned off from the panel")
 
     async def close(self) -> None:
         await self.stop()
@@ -136,7 +141,7 @@ class TTSService:
     def install(self) -> None:
         """Install the voice runtime in the background, then start the server."""
         if not self.uses_runtime:
-            raise RuntimeError("este servidor de voz é configurado manualmente (tts_server/setup.ps1)")
+            raise ServiceError("tts.manual_setup")
         self.installer.start(on_done=self.start)
 
     async def status(self) -> dict:

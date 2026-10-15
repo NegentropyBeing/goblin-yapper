@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import random
 
+from .i18n import MessageError
+
 TEAM_NAMES = ("azul", "verde", "roxo", "amarelo")
 QUEUE = "fila"  # pseudo-team name meaning "back to the queue"
 
 
-class SorterError(Exception):
+class SorterError(MessageError):
     pass
 
 
@@ -62,7 +64,7 @@ class TeamSorter:
 
     def set_team_count(self, n: int) -> None:
         if not 1 <= n <= len(TEAM_NAMES):
-            raise SorterError(f"número de times deve ser 1..{len(TEAM_NAMES)}")
+            raise SorterError("err.team_count", max=len(TEAM_NAMES))
         wanted = TEAM_NAMES[:n]
         dropped: list[str] = []
         for name in list(self.teams):
@@ -147,14 +149,14 @@ class TeamSorter:
         key = user.lower()
         target = target.lower()
         if target != QUEUE and target not in self.teams:
-            raise SorterError(f"time desconhecido: {target} (use {', '.join(self.teams)} ou {QUEUE})")
+            raise SorterError("err.unknown_target", team=target, teams=", ".join(self.teams), queue=QUEUE)
         if not self.leave(key):
-            raise SorterError(f"{user} não está na fila nem em um time")
+            raise SorterError("err.not_in_game", user=user)
         (self.queue if target == QUEUE else self.teams[target]).append(key)
 
     def remove(self, user: str) -> None:
         if not self.leave(user):
-            raise SorterError(f"{user} não está na fila nem em um time")
+            raise SorterError("err.not_in_game", user=user)
 
     # ---- internals -----------------------------------------------------
 

@@ -18,6 +18,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, replace
 
+from .i18n import Message, notice
 from .teams import SorterError
 from .tts import wav_duration
 
@@ -64,7 +65,7 @@ class SpeechSession:
         user = (login or display).lower()
         # the limit is per speaker, so one chatty speaker can't crowd out the other teams
         if self.pending[user] >= int(self.tts_cfg.get("max_queue", 5)):
-            log.info("fila de fala de %s cheia, ignorando: %s", display, text)
+            log.info("speech queue of %s is full, ignoring: %s", display, text)
             return False
         team = team or (self.roster.team_of(login) if login else None)
         self.pending[user] += 1
@@ -83,14 +84,14 @@ class SpeechSession:
             try:
                 await self._voice(utt)
             except Exception:
-                log.exception("erro ao falar: %s", utt.text)  # one bad line must not stop the worker
+                log.exception("error while speaking: %s", utt.text)  # one bad line must not stop the worker
 
     async def _voice(self, utt: Utterance) -> None:
         parts = await self._render(utt)
         if not parts or self._stale(utt):
             return
         if not self.stage.clients:
-            log.warning("nenhum overlay conectado; fala descartada: %s", utt.text)
+            log.warning("no overlay connected; line dropped: %s", utt.text)
             return
         self.playing = [part for part, _ in parts]
         self.speaking = lead = self.playing[0]
@@ -109,14 +110,14 @@ class SpeechSession:
                 for ws in list(self.stage.clients):
                     await self.stage.send(ws, {**msg, "play": ws is players[part.id]})
             if not has_player:
-                await self.stage.broadcast({"type": "notice", "text":
-                                            f"nenhum overlay com áudio para {'o time ' + lead.team if lead.team else 'quem está sem time'}"})
+                await self.stage.broadcast(notice("notice.no_overlay_team", team=lead.team) if lead.team
+                                           else notice("notice.no_overlay_no_team"))
             try:
                 # without a player nobody will report the end: just animate for the clip's length
                 await asyncio.wait_for(self.ended.wait(),
                                        timeout=max(wav_duration(wav) for _, wav in parts) + (3 if has_player else 0))
             except asyncio.TimeoutError:
-                log.debug("overlay não confirmou fim do áudio %s", lead.id)
+                log.debug("overlay did not confirm the end of audio %s", lead.id)
         finally:
             # also when a broadcast fails or the worker is cancelled: never leave the line "speaking"
             self.speaking, self.playing = None, []
@@ -158,10 +159,10 @@ class SpeechSession:
         except asyncio.CancelledError:
             if not self._skipped:
                 raise  # the worker itself is being cancelled
-            log.info("fala pulada durante a geração: %s", utt.text)
+            log.info("line skipped while being generated: %s", utt.text)
         except Exception as e:
-            log.warning("falha no TTS: %s", e)
-            await self.stage.broadcast({"type": "notice", "text": f"TTS falhou: {e}"})
+            log.warning("TTS failed: %s", e)
+            await self.stage.broadcast(notice("notice.tts_failed", error=str(e)))
         finally:
             self.generating = self._synth = None
             await self.stage.broadcast(self.stage.state())
@@ -172,17 +173,17 @@ class SpeechSession:
             self._skipped = True
             self._synth.cancel()
 
-    async def skip(self) -> str:
+    async def skip(self) -> Message:
         """Drop the one line in progress (stuck in the TTS, or playing) and go on with the queue."""
         if self.generating:
             utt = self.generating
             self._cancel_generation()
-            return f"fala de {utt.display} pulada (estava sendo gerada)"
+            return Message("msg.skipped_generating", {"user": utt.display})
         if self.speaking:
             utt = self.speaking
             await self._stop_playing()
-            return f"fala de {utt.display} pulada"
-        raise SorterError("nenhuma fala em andamento")
+            return Message("msg.skipped", {"user": utt.display})
+        raise SorterError("err.no_line")
 
     async def _stop_playing(self) -> None:
         for utt in self.playing:

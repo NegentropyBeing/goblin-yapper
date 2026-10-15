@@ -184,6 +184,7 @@
     .drawer-body { grid-template-columns: 1fr; }
     #test { margin-left: 0; width: 100%; } #test input { flex: 1; }
   }
+  body:not(.i18n-ready) { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -195,66 +196,70 @@
     <g transform="translate(369.05 25.70) scale(0.29)" fill="none" stroke="var(--bg)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"><path transform="translate(0 0)" d="M0 0 V40 Q0 72 32 72 H88 Q120 72 120 40 V0 M60 72 V140"/><path transform="translate(158 0)" d="M6 0 H88 Q120 0 120 32 V140 H32 Q0 140 0 108 V102 Q0 70 32 70 H120"/><path transform="translate(316 0)" d="M0 140 V0 H88 Q120 0 120 32 V52 Q120 84 88 84 H0"/><path transform="translate(474 0)" d="M0 140 V0 H88 Q120 0 120 32 V52 Q120 84 88 84 H0"/><path transform="translate(632 0)" d="M0 70 H120 V32 Q120 0 88 0 H32 Q0 0 0 32 V108 Q0 140 32 140 H114"/><path transform="translate(790 0)" d="M0 140 V0 H88 Q120 0 120 32 V48 Q120 80 88 80 H0 M70 80 H88 Q120 80 120 112 V140"/></g>
     </svg>
   </h1>
-  <nav class="tabs"><button data-tab-btn="goblin" class="on">Goblin</button><button data-tab-btn="voz">Voz</button></nav>
+  <nav class="tabs"><button data-tab-btn="goblin" class="on" data-i18n="tab.goblin"></button><button data-tab-btn="voz" data-i18n="tab.voice"></button></nav>
   <div class="group">
-    <span class="pill"><span class="dot" id="chatDot"></span><span id="chatStatus">desligado</span></span>
-    <input type="text" id="channel" placeholder="canal da twitch" size="14" spellcheck="false">
-    <button id="channelBtn">Conectar</button>
+    <span class="pill"><span class="dot" id="chatDot"></span><span id="chatStatus"></span></span>
+    <input type="text" id="channel" data-i18n-placeholder="channel.placeholder" size="14" spellcheck="false">
+    <button id="channelBtn"></button>
   </div>
   <div class="sep game-only"></div>
   <div class="group game-only">
-    <button id="queueBtn">Abrir fila</button>
-    <span class="pill">times</span>
+    <button id="queueBtn"></button>
+    <span class="pill" data-i18n="label.teams"></span>
     <div class="seg" id="teamCount"></div>
   </div>
   <div class="sep game-only"></div>
   <div class="group game-only">
-    <button class="primary" data-cmd="sort" title="Sorteia quem está na fila">Sortear</button>
-    <button data-cmd="resort" title="Devolve todos à fila e sorteia de novo">Re-sortear</button>
-    <button data-cmd="reset" title="Devolve todos dos times à fila">Devolver à fila</button>
-    <button class="danger" data-cmd="clear" data-confirm="Limpar fila e times?">Limpar</button>
+    <button class="primary" data-cmd="sort" data-i18n="btn.sort" data-i18n-title="tip.sort"></button>
+    <button data-cmd="resort" data-i18n="btn.resort" data-i18n-title="tip.resort"></button>
+    <button data-cmd="reset" data-i18n="btn.reset" data-i18n-title="tip.reset"></button>
+    <button class="danger" data-cmd="clear" data-i18n="btn.clear" data-i18n-confirm="confirm.clear"></button>
+  </div>
+  <div class="group" style="margin-left:auto">
+    <label class="pill"><span data-i18n="lang.label"></span>
+      <select id="langSel"><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select>
+    </label>
   </div>
 </header>
 
 <div class="tab" id="tab-goblin">
 <section id="voicebar">
   <div id="speakers"></div>
-  <label class="toggle" title="Cada time pode ter alguém com a voz ao mesmo tempo; as falas tocam uma de cada vez">
-    <input type="checkbox" id="multiVoice"> vários times ao mesmo tempo</label>
-  <button data-cmd="next" id="nextBtn" title="Outra pessoa do mesmo time do último sorteado">Próximo do time</button>
-  <button data-cmd="voice any" title="Qualquer time">Aleatório geral</button>
-  <button class="danger" data-cmd="stop" id="stopAllBtn">Parar voz</button>
-  <button data-cmd="skip" id="skipBtn" disabled title="Pula só a fala em andamento (travada na geração ou tocando); a fila de falas continua">⏭ Pular fala</button>
+  <label class="toggle" data-i18n-title="tip.multivoice">
+    <input type="checkbox" id="multiVoice"> <span data-i18n="opt.multivoice"></span></label>
+  <button data-cmd="next" id="nextBtn" data-i18n="btn.next_in_team" data-i18n-title="tip.next_in_team"></button>
+  <button data-cmd="voice any" data-i18n="btn.any_team" data-i18n-title="tip.any_team"></button>
+  <button class="danger" data-cmd="stop" id="stopAllBtn"></button>
+  <button data-cmd="skip" id="skipBtn" disabled data-i18n="btn.skip" data-i18n-title="tip.skip"></button>
   <span class="pill" id="lineInfo"></span>
-  <form id="test"><input type="text" id="testText" placeholder="testar TTS no goblin do time…"><button>Falar</button></form>
+  <form id="test"><input type="text" id="testText" data-i18n-placeholder="test.placeholder"><button data-i18n="btn.speak"></button></form>
 </section>
 
 <section id="autobar">
-  <span class="auto" title="Quem está na fila ou em um time e fica esse tempo sem escrever no chat é retirado. Só conta com o chat conectado.">
-    <label class="toggle"><input type="checkbox" id="autoRemove"> tirar inativos após</label>
-    <input type="number" id="autoRemoveMin" min="1" max="1440" step="1"> min sem falar no chat</span>
-  <span class="auto" title="Passado esse tempo, a voz vai para outra pessoa sorteada do mesmo time (espera a fala atual terminar).">
-    <label class="toggle"><input type="checkbox" id="autoRotate"> trocar quem tem a voz a cada</label>
-    <input type="number" id="autoRotateMin" min="1" max="1440" step="1"> min</span>
+  <span class="auto" data-i18n-title="tip.autoremove">
+    <label class="toggle"><input type="checkbox" id="autoRemove"> <span data-i18n="opt.autoremove"></span></label>
+    <input type="number" id="autoRemoveMin" min="1" max="1440" step="1"> <span data-i18n="opt.autoremove_suffix"></span></span>
+  <span class="auto" data-i18n-title="tip.autorotate">
+    <label class="toggle"><input type="checkbox" id="autoRotate"> <span data-i18n="opt.autorotate"></span></label>
+    <input type="number" id="autoRotateMin" min="1" max="1440" step="1"> <span data-i18n="opt.autorotate_suffix"></span></span>
 </section>
 
 <main id="board"></main>
 
 <details id="drawer">
-  <summary>Overlay do OBS e imagens do goblin</summary>
+  <summary data-i18n="drawer.summary"></summary>
   <div class="drawer-body">
     <div>
-      <h3>Fontes de navegador para o OBS</h3>
+      <h3 data-i18n="drawer.urls"></h3>
       <div class="urls" id="urls"></div>
-      <label class="toggle" style="margin-top:8px" title="A fonte de cada time só mostra o goblin enquanto alguém do time tem a voz (ou durante um teste de fala do time). A fonte principal já funciona assim.">
-        <input type="checkbox" id="hideIdle"> esconder o goblin dos times que estão sem voz</label>
-      <h3 style="margin-top:14px">Pasta de dados</h3>
+      <label class="toggle" style="margin-top:8px" data-i18n-title="tip.hideidle">
+        <input type="checkbox" id="hideIdle"> <span data-i18n="opt.hideidle"></span></label>
+      <h3 style="margin-top:14px" data-i18n="drawer.data"></h3>
       <div class="pill" id="dataInfo"></div>
     </div>
     <div>
-      <h3>Imagens do goblin</h3>
-      <p class="hint" style="margin:0 0 8px">Cada time pode ter o seu par png + gif; sem imagem própria, usa o padrão.
-        A tinta de cada time (na coluna do time) é aplicada por cima.</p>
+      <h3 data-i18n="drawer.images"></h3>
+      <p class="hint" style="margin:0 0 8px" data-i18n="drawer.images_hint"></p>
       <div id="uploads"></div>
     </div>
   </div>
@@ -264,91 +269,92 @@
 <div class="tab" id="tab-voz">
   <section id="vzStatus">
     <span class="dot" id="vzDot"></span>
-    <span id="vzStatusText">verificando servidor de voz…</span>
+    <span id="vzStatusText" data-i18n="vz.checking"></span>
     <span class="spacer"></span>
-    <label class="pill">motor
+    <label class="pill"><span data-i18n="vz.engine"></span>
       <select id="vzEngine">
-        <option value="server">OmniVoice (servidor)</option>
-        <option value="sapi">Windows (SAPI)</option>
-        <option value="dummy">teste (bipes)</option>
+        <option value="server" data-i18n="vz.engine_server"></option>
+        <option value="sapi" data-i18n="vz.engine_sapi"></option>
+        <option value="dummy" data-i18n="vz.engine_dummy"></option>
       </select>
     </label>
-    <button id="vzPurgeAsr" hidden title="Descarrega o Whisper (transcrição) e libera a VRAM dele. Ele volta sozinho na próxima transcrição.">Descarregar Whisper</button>
-    <button id="vzPower" disabled>Desligar modelo</button>
-    <button id="vzRestart">Reiniciar servidor</button>
+    <button id="vzPurgeAsr" hidden data-i18n="btn.purge_whisper" data-i18n-title="tip.purge_whisper"></button>
+    <button id="vzPower" disabled></button>
+    <button id="vzRestart" data-i18n="btn.restart_server"></button>
   </section>
   <div id="vzBanner" hidden></div>
 
   <div id="vzGrid">
     <!-- profiles -->
     <section class="card">
-      <h2>Novo perfil de voz</h2>
+      <h2 data-i18n="vz.new_profile"></h2>
       <label class="vz-drop" id="vzDrop">
         <input type="file" id="vzFile" accept="audio/*,.wav" hidden>
-        <strong>Arraste um .wav aqui</strong>
-        <span>ou clique para escolher · 3–20s de fala limpa funciona melhor</span>
+        <strong data-i18n="vz.drop_title"></strong>
+        <span data-i18n="vz.drop_hint"></span>
       </label>
       <div class="vz-opts">
-        <label><input type="checkbox" id="vzTrim" checked> cortar silêncio</label>
-        <label><input type="checkbox" id="vzNorm" checked> normalizar volume</label>
-        <label><input type="checkbox" id="vzAuto" checked> transcrever com Whisper</label>
-        <label>máx. <input type="number" id="vzMax" value="20" min="3" max="60" step="1"> s</label>
+        <label><input type="checkbox" id="vzTrim" checked> <span data-i18n="opt.trim"></span></label>
+        <label><input type="checkbox" id="vzNorm" checked> <span data-i18n="opt.normalize"></span></label>
+        <label><input type="checkbox" id="vzAuto" checked> <span data-i18n="opt.transcribe"></span></label>
+        <label><span data-i18n="opt.max"></span> <input type="number" id="vzMax" value="20" min="3" max="60" step="1"> s</label>
       </div>
       <ol class="vz-steps" id="vzSteps">
-        <li data-step="prepare">Preparar áudio</li>
-        <li data-step="transcribe">Transcrever</li>
-        <li data-step="review">Revisar transcrição</li>
-        <li data-step="create">Criar perfil</li>
+        <li data-step="prepare" data-i18n="step.prepare"></li>
+        <li data-step="transcribe" data-i18n="step.transcribe"></li>
+        <li data-step="review" data-i18n="step.review"></li>
+        <li data-step="create" data-i18n="step.create"></li>
       </ol>
       <div id="vzDraft" hidden>
         <audio id="vzDraftAudio" controls></audio>
-        <label class="field-label">Transcrição (o que é falado no áudio)</label>
-        <textarea id="vzRefText" rows="3" placeholder="digite exatamente o que é dito no áudio…"></textarea>
+        <label class="field-label" data-i18n="vz.transcript_label"></label>
+        <textarea id="vzRefText" rows="3" data-i18n-placeholder="vz.reftext_placeholder"></textarea>
         <div class="row">
-          <input type="text" id="vzName" placeholder="nome do perfil">
-          <button class="primary" id="vzCreate">Criar perfil</button>
-          <button id="vzCancel">Cancelar</button>
+          <input type="text" id="vzName" data-i18n-placeholder="vz.name_placeholder">
+          <button class="primary" id="vzCreate" data-i18n="btn.create_profile"></button>
+          <button id="vzCancel" data-i18n="btn.cancel"></button>
         </div>
       </div>
 
-      <h2 style="margin-top:18px">Perfis</h2>
-      <ul class="vz-profiles" id="vzProfiles" data-empty="nenhum perfil ainda — crie um acima"></ul>
-      <p class="hint" id="vzProfilesDir" title="Cada pasta de dados tem os seus próprios perfis"></p>
+      <h2 style="margin-top:18px" data-i18n="vz.profiles"></h2>
+      <ul class="vz-profiles" id="vzProfiles"></ul>
+      <p class="hint" id="vzProfilesDir" data-i18n-title="tip.profiles_dir"></p>
     </section>
 
     <!-- parameters -->
     <section class="card">
-      <h2>Parâmetros</h2>
+      <h2 data-i18n="vz.params"></h2>
       <div class="row">
         <select id="vzScope"></select>
-        <button class="primary" id="vzSave" disabled>Salvar</button>
+        <button class="primary" id="vzSave" disabled data-i18n="btn.save"></button>
       </div>
       <p class="hint" id="vzScopeHint"></p>
       <div id="vzParams"></div>
-      <details id="vzAdvanced"><summary>Avançados</summary><div id="vzParamsAdv"></div></details>
+      <details id="vzAdvanced"><summary data-i18n="vz.advanced"></summary><div id="vzParamsAdv"></div></details>
     </section>
 
     <!-- test + team voices -->
     <section class="card">
-      <h2>Testar fala</h2>
-      <textarea id="vzTestText" rows="3">Fala chat! Eu sou o goblin e hoje eu vou ler as mensagens de vocês.</textarea>
+      <h2 data-i18n="vz.test_title"></h2>
+      <textarea id="vzTestText" rows="3"></textarea>
       <div class="row">
         <select id="vzTestProfile"></select>
-        <button class="primary" id="vzSpeak">Falar</button>
+        <button class="primary" id="vzSpeak" data-i18n="btn.speak"></button>
       </div>
-      <p class="hint">Usa os parâmetros do formulário, mesmo antes de salvar.</p>
+      <p class="hint" data-i18n="vz.test_hint"></p>
       <audio id="vzTestAudio" controls hidden></audio>
       <p class="hint" id="vzTestInfo"></p>
 
-      <h2 style="margin-top:18px">Voz de cada time</h2>
+      <h2 style="margin-top:18px" data-i18n="vz.team_voices"></h2>
       <div id="vzTeams"></div>
     </section>
   </div>
 </div>
 
 <div id="toast"></div>
-<div id="offline">conectando ao servidor…</div>
+<div id="offline" data-i18n="offline.connecting"></div>
 
+<script src="/web/i18n.js"></script>
 <script>
 const TEAM_COLORS_FALLBACK = { azul: "#3b82f6", verde: "#22c55e", roxo: "#a855f7", amarelo: "#facc15" };
 let state = null, ws = null, assetFiles = [];
@@ -367,11 +373,11 @@ async function cmd(command, { quiet = false } = {}) {
   try {
     const r = await fetch("/api/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command }) });
     const data = await r.json();
-    const err = data.output.startsWith("erro");
-    if (err || !quiet) toast(data.output.split("\n")[0], err);
-    state = data.state; render();
+    const err = !data.ok;
+    if (err || !quiet) toast(i18n.fromServer(data).split("\n")[0], err);
+    state = data.state; await applyStateLanguage(); render();
     return !err;
-  } catch (e) { toast("servidor indisponível", true); return false; }
+  } catch (e) { toast(t("toast.server_unavailable"), true); return false; }
 }
 
 // Last-resort player: the server only asks the panel to play a line (msg.play) when no OBS overlay
@@ -393,7 +399,7 @@ function connect() {
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === "state") { state = msg; render(); }
+    if (msg.type === "state") { state = msg; applyStateLanguage().then(render); }
     else if (msg.type === "speak" || msg.type === "idle" || msg.type === "stop") {
       if (msg.type === "speak") {
         lines.set(msg.id, { team: msg.team, user: msg.user });
@@ -407,7 +413,7 @@ function connect() {
       setTalking(); renderLine();
     }
     else if (msg.type === "assets") loadAssets();
-    else if (msg.type === "notice") toast(msg.text, !msg.ok);
+    else if (msg.type === "notice") toast(msg.key ? i18n.fromServer(msg) : msg.text, !msg.ok);
   };
   ws.onclose = () => {
     // their "idle" would be missed while offline
@@ -418,19 +424,22 @@ function connect() {
 }
 
 // ---- render ---------------------------------------------------------
-function teamColor(t) { return state?.tints?.[t]?.color || TEAM_COLORS_FALLBACK[t] || "#8b91a5"; }
+function teamColor(id) { return state?.tints?.[id]?.color || TEAM_COLORS_FALLBACK[id] || "#8b91a5"; }
+const TEAM_NAMES = () => ({ azul: t("team.azul"), verde: t("team.verde"), roxo: t("team.roxo"), amarelo: t("team.amarelo") });
+const teamName = (id) => TEAM_NAMES()[id] ?? id;
 
 let boardKey = "";
 function render() {
   if (!state) return;
   const chat = state.chat;
-  $("#chatStatus").textContent = chat.channel ? `#${chat.channel} · ${chat.status}` : "chat desligado";
-  $("#chatDot").className = "dot " + ({ conectado: "ok", conectando: "warn", reconectando: "bad" }[chat.status] || "");
+  const chatStatus = { connecting: t("chat.connecting"), connected: t("chat.connected"), reconnecting: t("chat.reconnecting") };
+  $("#chatStatus").textContent = chat.channel ? `#${chat.channel} · ${chatStatus[chat.status] ?? chat.status}` : t("chat.off");
+  $("#chatDot").className = "dot " + ({ connected: "ok", connecting: "warn", reconnecting: "bad" }[chat.status] || "");
   if (document.activeElement !== $("#channel")) $("#channel").value = chat.channel;
-  $("#channelBtn").textContent = chat.channel && $("#channel").value === chat.channel ? "Desconectar" : "Conectar";
+  $("#channelBtn").textContent = chat.channel && $("#channel").value === chat.channel ? t("btn.disconnect") : t("btn.connect");
 
   const queueBtn = $("#queueBtn");
-  queueBtn.textContent = state.queue_open ? "Fechar fila" : "Abrir fila";
+  queueBtn.textContent = state.queue_open ? t("queue.close") : t("queue.open");
   queueBtn.classList.toggle("primary", !state.queue_open);
 
   const teams = Object.keys(state.teams);
@@ -440,7 +449,7 @@ function render() {
   $("#multiVoice").checked = state.multi_voice;
   $("#hideIdle").checked = state.hide_idle;
   $("#nextBtn").disabled = !state.voice.user;
-  $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? "Parar todos" : "Parar voz";
+  $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? t("btn.stop_all") : t("btn.stop_voice");
   renderLine();
   for (const [id, opt] of [["autoRemove", state.auto_remove], ["autoRotate", state.auto_rotate]]) {
     $(`#${id}`).checked = opt.on;
@@ -450,8 +459,8 @@ function render() {
   renderBoard(teams);
   renderUrls(teams);
   renderUploads(teams);
-  $("#dataInfo").textContent = `${state.data_dir || "-"}  ·  TTS: ${state.tts_engine}` +
-    (state.tts_error ? `  (falha ao carregar: ${state.tts_error})` : "");
+  $("#dataInfo").textContent = t("data.info", { dir: state.data_dir || "-", engine: state.tts_engine }) +
+    (state.tts_error ? "  " + t("data.load_failed", { error: state.tts_error }) : "");
   vzOnState();
 }
 
@@ -462,32 +471,32 @@ function renderBoard(teams) {
   if (key !== boardKey) {
     boardKey = key;
     board.style.setProperty("--cols", teams.length + 1);
-    board.innerHTML = colHtml("fila", "Fila", false) + teams.map(t => colHtml(t, t, true)).join("");
+    board.innerHTML = colHtml("fila", t("col.queue"), false) + teams.map(tm => colHtml(tm, teamName(tm), true)).join("");
   }
-  fillMembers($('[data-col="fila"]'), state.queue, "ninguém na fila — !joinsort");
+  fillMembers($('[data-col="fila"]'), state.queue);
   $('[data-col="fila"] .count').textContent = state.queue.length;
-  for (const t of teams) {
-    const col = $(`[data-col="${t}"]`);
-    const tint = state.tints[t];
+  for (const tm of teams) {
+    const col = $(`[data-col="${tm}"]`);
+    const tint = state.tints[tm];
     col.style.setProperty("--team", tint.color);
-    if (document.activeElement?.closest(`[data-col="${t}"] .tint`) == null) {
+    if (document.activeElement?.closest(`[data-col="${tm}"] .tint`) == null) {
       $(".tint-color", col).value = tint.color;
       $(".tint-strength", col).value = Math.round(tint.strength * 100);
     }
     $(".tint-strength", col).style.setProperty("--pct", $(".tint-strength", col).value + "%");
-    $(".count", col).textContent = state.teams[t].length;
+    $(".count", col).textContent = state.teams[tm].length;
     // per-team voice buttons: draw a speaker, or next/stop when the team already has one
-    const hasSpeaker = (state.speakers || []).some(sp => sp.team === t);
-    const empty = state.teams[t].length === 0 ? "disabled" : "";
-    const profile = (state.team_profiles || {})[t] || (state.team_profiles || {}).default;
+    const hasSpeaker = (state.speakers || []).some(sp => sp.team === tm);
+    const empty = state.teams[tm].length === 0 ? "disabled" : "";
+    const profile = (state.team_profiles || {})[tm] || (state.team_profiles || {}).default;
+    const detail = profile ? t("detail.profile_chosen") : t("detail.no_profile");
     const acts = (hasSpeaker
-      ? `<button data-cmd="next ${t}" ${state.teams[t].length < 2 ? "disabled" : ""} title="Outra pessoa deste time">⏭ Próximo</button>
-         <button class="danger" data-cmd="stop ${t}" title="Tirar a voz deste time">⏹ Parar</button>`
-      : `<button data-cmd="voice ${t}" ${empty}>🎤 Sortear voz</button>`)
-      + `<button data-cmd="testvoice ${t}" title="O goblin deste time diz uma frase fixa com a voz do time (${
-          profile ? "perfil escolhido na aba Voz" : "sem perfil: voz automática"})">🔊 Testar voz</button>`;
+      ? `<button data-cmd="next ${tm}" ${state.teams[tm].length < 2 ? "disabled" : ""} title="${esc(t("tip.next_this_team"))}">${esc(t("btn.next_short"))}</button>
+         <button class="danger" data-cmd="stop ${tm}" title="${esc(t("tip.stop_team"))}">${esc(t("btn.stop_short"))}</button>`
+      : `<button data-cmd="voice ${tm}" ${empty}>${esc(t("btn.draw_voice"))}</button>`)
+      + `<button data-cmd="testvoice ${tm}" title="${esc(t("tip.test_voice", { detail }))}">${esc(t("btn.test_voice"))}</button>`;
     if ($(".voice-acts", col).innerHTML !== acts) $(".voice-acts", col).innerHTML = acts;
-    fillMembers(col, state.teams[t], "vazio");
+    fillMembers(col, state.teams[tm]);
   }
 }
 
@@ -501,11 +510,11 @@ function colHtml(id, title, isTeam) {
           ${isTeam ? `<div class="voice-acts"></div>` : ""}
         </div>
       </div>
-      ${isTeam ? `<div class="tint" title="Tinta do goblin">tinta <input type="color" class="tint-color" data-team="${id}">
+      ${isTeam ? `<div class="tint" title="${esc(t("tip.tint"))}">${esc(t("tint.label"))} <input type="color" class="tint-color" data-team="${id}">
         <input type="range" class="tint-strength" data-team="${id}" min="0" max="100"></div>` : ""}
     </div>
-    <ul class="members" data-empty="${isTeam ? "vazio" : "ninguém na fila — !joinsort"}"></ul>
-    ${isTeam ? "" : `<form class="add"><input type="text" placeholder="adicionar nick" spellcheck="false"><button>+</button></form>`}
+    <ul class="members" data-empty="${esc(isTeam ? t("col.team_empty") : t("col.queue_empty"))}"></ul>
+    ${isTeam ? "" : `<form class="add"><input type="text" placeholder="${esc(t("add.placeholder"))}" spellcheck="false"><button>+</button></form>`}
   </section>`;
 }
 
@@ -515,8 +524,8 @@ function fillMembers(col, people) {
     <li class="chip ${speakerIds.has(p.id) ? "active" : ""}" draggable="true" data-user="${esc(p.id)}">
       <span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
       <span class="acts">
-        <button class="icon" data-cmd="give ${esc(p.id)}" title="Dar a voz">🎤</button>
-        <button class="icon danger" data-cmd="remove ${esc(p.id)}" title="Remover">✕</button>
+        <button class="icon" data-cmd="give ${esc(p.id)}" title="${esc(t("tip.give_voice"))}">🎤</button>
+        <button class="icon danger" data-cmd="remove ${esc(p.id)}" title="${esc(t("tip.remove"))}">✕</button>
       </span>
     </li>`).join("");
 }
@@ -532,7 +541,7 @@ function setTalking() {
 let talkingUser = null;
 function renderLine() {
   const gen = state?.generating;
-  $("#lineInfo").textContent = gen ? `gerando fala de ${gen.user}…` : talkingUser ? `falando: ${talkingUser}` : "";
+  $("#lineInfo").textContent = gen ? t("line.generating", { user: gen.user }) : talkingUser ? t("line.speaking", { user: talkingUser }) : "";
   $("#skipBtn").disabled = !gen && !talkingUser;
 }
 
@@ -543,27 +552,25 @@ function renderSpeakers() {
     <div class="spk ${talking.has(sp.team ?? "") ? "talking" : ""}"
          data-team="${esc(sp.team ?? "")}" style="--team:${sp.team ? teamColor(sp.team) : "var(--line)"}">
       <span class="mic">🎤</span>
-      <div style="flex:1;min-width:0"><div class="who">${esc(sp.user)}</div><div class="team">${sp.team ? `time ${esc(sp.team)}` : "sem time"}</div></div>
-      <button class="icon danger" data-cmd="stop ${esc(sp.id)}" title="Tirar a voz de ${esc(sp.user)}">✕</button>
+      <div style="flex:1;min-width:0"><div class="who">${esc(sp.user)}</div><div class="team">${esc(sp.team ? t("spk.team", { team: teamName(sp.team) }) : t("spk.no_team"))}</div></div>
+      <button class="icon danger" data-cmd="stop ${esc(sp.id)}" title="${esc(t("spk.take_voice", { user: sp.user }))}">✕</button>
     </div>`).join("")
-    : `<div class="spk empty"><span class="mic">🎤</span><div><div class="who">ninguém com a voz</div>
-         <div class="team">escolha um time ou uma pessoa</div></div></div>`;
+    : `<div class="spk empty"><span class="mic">🎤</span><div><div class="who">${esc(t("spk.none"))}</div>
+         <div class="team">${esc(t("spk.hint"))}</div></div></div>`;
 }
 
 function renderUrls(teams) {
   const base = `${location.protocol}//${location.host}/overlay`;
   const overlays = state.overlays || [];
   // [label, url, pinned team (null = main)]
-  const rows = [["Principal", base, null], ...teams.map(t => [`Time ${t}`, `${base}?team=${t}`, t])];
+  const rows = [[t("url.main"), base, null], ...teams.map(tm => [t("url.team", { team: teamName(tm) }), `${base}?team=${tm}`, tm])];
   const html = rows.map(([label, url, team]) => {
     const mine = overlays.filter(o => o.team === team);
-    const status = !mine.length ? "não conectada" : mine.some(o => o.audio) ? "conectada" : "conectada, sem áudio";
+    const status = !mine.length ? t("url.not_connected") : mine.some(o => o.audio) ? t("url.connected") : t("url.connected_no_audio");
     return `<div class="url"><span class="dot ${mine.length ? "ok" : ""}" title="${status}"></span>
       <span style="width:96px;color:${team ? teamColor(team) : "var(--muted)"};font-size:12px;text-transform:capitalize">${label}</span>
-      <code>${esc(url)}</code><button class="icon" data-copy="${esc(url)}">copiar</button></div>`;
-  }).join("") + `<p class="hint" style="margin-top:6px">Cada fonte de time mostra o goblin e toca só as falas do seu time.
-    A principal toca as falas dos times sem fonte própria. O ponto verde indica que a fonte está aberta no OBS.
-    O goblin ocupa a fonte inteira: ajuste o tamanho pela largura e altura da fonte no OBS (640 × 400 encaixa bem).</p>`;
+      <code>${esc(url)}</code><button class="icon" data-copy="${esc(url)}">${esc(t("btn.copy"))}</button></div>`;
+  }).join("") + `<p class="hint" style="margin-top:6px">${esc(t("url.hint"))}</p>`;
   if ($("#urls").innerHTML !== html) $("#urls").innerHTML = html;
 }
 
@@ -575,10 +582,10 @@ function renderUploads(teams) {
     uploadsKey = key;
     const row = (stem, label) => `<div class="up-row" data-row="${stem}"><b>${label}</b>
       <label class="upload" data-file="${stem}.png"></label><label class="upload" data-file="${stem}.gif"></label></div>`;
-    $("#uploads").innerHTML = row("goblin", "Padrão") + teams.map(t => row(t, t)).join("");
+    $("#uploads").innerHTML = row("goblin", t("up.default")) + teams.map(tm => row(tm, teamName(tm))).join("");
     loadAssets();
   }
-  for (const t of teams) $(`.up-row[data-row="${t}"]`).style.setProperty("--team", teamColor(t));
+  for (const tm of teams) $(`.up-row[data-row="${tm}"]`).style.setProperty("--team", teamColor(tm));
 }
 
 // ---- assets ---------------------------------------------------------
@@ -587,21 +594,21 @@ async function loadAssets() {
   for (const el of document.querySelectorAll(".upload")) {
     const f = el.dataset.file, has = assetFiles.includes(f);
     const ext = f.split(".")[1], shared = `goblin.${ext}`;
-    const label = ext === "png" ? "parado (.png)" : "falando (.gif)";
+    const label = ext === "png" ? t("up.still") : t("up.talking");
     // an empty team slot shows what that team uses instead: the shared image, or the built-in goblin
-    const empty = f === shared ? `<div class="ph">arraste ou clique para enviar</div>`
-      : assetFiles.includes(shared) ? `<img class="fallback" src="/assets/${shared}?t=${Date.now()}" title="usando o padrão">`
-      : `<div class="ph">usa o padrão</div>`;
+    const empty = f === shared ? `<div class="ph">${esc(t("up.drop"))}</div>`
+      : assetFiles.includes(shared) ? `<img class="fallback" src="/assets/${shared}?t=${Date.now()}" title="${esc(t("up.using_default"))}">`
+      : `<div class="ph">${esc(t("up.uses_default"))}</div>`;
     el.innerHTML = `${has ? `<img src="/assets/${f}?t=${Date.now()}">` : empty}
       <span class="label">${label}</span>
       <input type="file" accept="${f.endsWith(".png") ? "image/png" : "image/gif"}" hidden>
-      ${has ? `<button class="icon danger" data-delete="${f}">remover</button>` : ""}`;
+      ${has ? `<button class="icon danger" data-delete="${f}">${esc(t("btn.remove_asset"))}</button>` : ""}`;
   }
 }
 
 async function uploadAsset(file, name) {
   const r = await fetch(`/api/assets/${name}`, { method: "PUT", body: file });
-  if (r.ok) toast(`${name} atualizado`); else toast(await r.text(), true);
+  if (r.ok) toast(t("toast.asset_updated", { name })); else toast(await errorText(r), true);
   loadAssets();
 }
 
@@ -613,7 +620,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     cmd(b.dataset.cmd);
   } else if (b.dataset.teams) cmd(`teams ${b.dataset.teams}`);
-  else if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => toast("copiado")); }
+  else if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => toast(t("toast.copied"))); }
   else if (b.dataset.delete) { e.preventDefault(); await fetch(`/api/assets/${b.dataset.delete}`, { method: "DELETE" }); loadAssets(); }
   else if (b.id === "queueBtn") cmd(state.queue_open ? "close" : "open");
   else if (b.id === "channelBtn") {
@@ -691,10 +698,29 @@ document.addEventListener("change", (e) => {
   if (up && e.target.files?.length) uploadAsset(e.target.files[0], up.dataset.file);
 });
 
+// The interface language is the operator's stored choice (state.language) or, without one, the system's.
+// Switching reloads the catalogs, rewrites the static text and rebuilds every piece of text the panel drew.
+let shownLanguage = null;
+async function setLanguage(lang) {
+  if (lang === shownLanguage) return;
+  shownLanguage = lang;
+  await i18n.load(lang);
+  i18n.apply();
+  $("#langSel").value = lang;
+  const testText = $("#vzTestText");
+  if (!testText.dataset.edited) testText.value = t("vz.test_text");
+  boardKey = ""; uploadsKey = null; profilesKey = ""; vz.teamsKey = "";
+  if (state) { render(); loadAssets(); }
+  if (vz.loaded) { renderScope(); renderParams(); renderTestProfiles(); }
+  if (vz.status) renderVzStatus();
+}
+const applyStateLanguage = () => setLanguage(i18n.resolveLanguage(state?.language));
+$("#vzTestText").addEventListener("input", (e) => { e.target.dataset.edited = "1"; });
+$("#langSel").addEventListener("change", (e) => cmd(`language ${e.target.value}`, { quiet: true }));
+
 $("#offline").classList.add("show");
-fetch("/api/state").then(r => r.json()).then(s => { state = s; render(); }).catch(() => {});
-loadAssets();
-connect();
+fetch("/api/state").then(r => r.json()).then(s => { state = s; return applyStateLanguage(); }).catch(() => setLanguage(i18n.resolveLanguage(null)))
+  .finally(() => { document.body.classList.add("i18n-ready"); render(); loadAssets(); connect(); });
 
 // ---- Voz tab ---------------------------------------------------------
 // Talks to the TTS server through the backend's /api/tts/* proxy.
@@ -702,9 +728,16 @@ const vz = { schema: null, settings: { params: {} }, profiles: [], status: null,
              scope: "global", form: {}, dirty: false, timer: null, loaded: false, teamsKey: "" };
 const profileAudio = new Audio();
 
+// An error body from this app is {key, params, text}; anything else (the voice server's own errors) is shown as it came.
+async function errorText(r) {
+  const raw = await r.text();
+  try { const e = JSON.parse(raw); if (e && e.key) return i18n.fromServer(e); } catch {}
+  return raw || `HTTP ${r.status}`;
+}
+
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
-  if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
+  if (!r.ok) throw new Error(await errorText(r));
   return (r.headers.get("content-type") || "").includes("json") ? r.json() : r;
 }
 const jsonOpts = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -724,46 +757,48 @@ async function vzPoll() {
   if (!vz.loaded) { vz.loaded = true; await vzLoadAll(); }
 }
 
+const INSTALL_STEPS = () => ({ uv: t("install.step.uv"), python: t("install.step.python"), torch: t("install.step.torch"),
+                              omnivoice: t("install.step.omnivoice"), gpu: t("install.step.gpu") });
+const installStep = (s) => INSTALL_STEPS()[s.id] ?? s.label;
+
 // First-run install of the voice runtime (installed app). Returns banner HTML.
 function installBanner(st) {
   const ins = st.install || {};
   if (ins.state === "running") {
     const cur = ins.steps.findIndex(s => s.id === ins.step);
-    return `<b>Instalando o servidor de voz…</b> <span class="hint">${ins.elapsed ?? 0}s · pode levar 10–20 min, dependendo da internet</span>
+    return `<b>${esc(t("vz.installing"))}</b> <span class="hint">${esc(t("vz.install_time", { elapsed: ins.elapsed ?? 0 }))}</span>
       <ol class="vz-steps" style="margin-top:8px">${ins.steps.map((s, i) =>
-        `<li class="${i < cur ? "done" : i === cur ? "running" : ""}">${esc(s.label)}</li>`).join("")}</ol>
+        `<li class="${i < cur ? "done" : i === cur ? "running" : ""}">${esc(installStep(s))}</li>`).join("")}</ol>
       <pre class="vz-log">${esc((ins.log || []).join("\n"))}</pre>`;
   }
   const retry = ins.state === "error"
-    ? `<p style="color:#fca5a5;margin:8px 0">A instalação falhou: ${esc(ins.error)}</p>` : "";
-  return `<b>O servidor de voz (OmniVoice) ainda não está instalado.</b>
-    <p class="hint" style="margin:6px 0">A instalação baixa ~3,5 GB (Python, PyTorch com CUDA e OmniVoice; ~8 GB no disco) para
-      <code>${esc(ins.dir || "")}</code>. Ao iniciar pela primeira vez, o modelo de voz (~3 GB) também é baixado.
-      Precisa de uma GPU NVIDIA para ficar rápido.</p>${retry}
-    <button class="primary" id="vzInstall">${ins.state === "error" ? "Tentar de novo" : "Instalar servidor de voz"}</button>`;
+    ? `<p style="color:#fca5a5;margin:8px 0">${esc(t("vz.install_failed", { error: ins.error }))}</p>` : "";
+  return `<b>${esc(t("vz.install_title"))}</b>
+    <p class="hint" style="margin:6px 0">${t("vz.install_body", { dir: ins.dir || "" }, true)}</p>${retry}
+    <button class="primary" id="vzInstall">${esc(ins.state === "error" ? t("btn.retry") : t("btn.install"))}</button>`;
 }
 
 function renderVzStatus() {
   const st = vz.status, sv = st.server || {};
   let dot = "", text, banner = "";
-  if (st.install?.state === "running") { dot = "warn"; text = "instalando servidor de voz…"; banner = installBanner(st); }
-  else if (st.mode === "not_installed" && st.can_install) { dot = "bad"; text = "servidor de voz não instalado"; banner = installBanner(st); }
+  if (st.install?.state === "running") { dot = "warn"; text = t("vz.s.installing"); banner = installBanner(st); }
+  else if (st.mode === "not_installed" && st.can_install) { dot = "bad"; text = t("vz.s.not_installed"); banner = installBanner(st); }
   else if (st.mode === "not_installed") {
-    dot = "bad"; text = "servidor de voz não instalado";
-    banner = "O ambiente do servidor de voz (PyTorch + OmniVoice) não foi encontrado.<br>Instale com <code>tts_server\\setup.ps1</code> e depois clique em Reiniciar servidor.";
-  } else if (st.mode === "exited") { dot = "bad"; text = "o servidor de voz parou"; banner = `Veja o log: <code>${esc(st.log)}</code>`; }
-  else if (st.mode === "offline") { dot = "bad"; text = "sem conexão com o app"; }
-  else if (st.mode === "stopped") { text = "modelo de voz desligado · VRAM liberada"; }
-  else if (st.mode === "disabled") { text = "servidor de voz parado"; }
+    dot = "bad"; text = t("vz.s.not_installed");
+    banner = t("vz.env_missing");
+  } else if (st.mode === "exited") { dot = "bad"; text = t("vz.s.exited"); banner = t("vz.see_log", { log: st.log }, true); }
+  else if (st.mode === "offline") { dot = "bad"; text = t("vz.s.offline"); }
+  else if (st.mode === "stopped") { text = t("vz.s.stopped"); }
+  else if (st.mode === "disabled") { text = t("vz.s.disabled"); }
   else if (sv.state === "ready") {
     dot = "ok";
-    text = [sv.label, "pronto", sv.gpu, sv.vram_model_gb != null ? `modelo usa ${sv.vram_model_gb} GB` : "",
-            sv.vram_used_gb != null ? `VRAM da placa ${sv.vram_used_gb}/${sv.vram_total_gb} GB` : "",
-            sv.asr_loaded ? "Whisper carregado" : "", sv.busy ? `${sv.busy}…` : "",
-            st.mode === "external" ? "iniciado fora do app" : ""].filter(Boolean).join(" · ");
-  } else if (sv.state === "error") { dot = "bad"; text = "erro ao carregar o modelo"; banner = `${esc(sv.error)}<br>Log: <code>${esc(st.log)}</code>`; }
-  else { dot = "warn"; text = "carregando modelo de voz… (a primeira vez baixa ~3 GB)"; }
-  $("#vzProfilesDir").textContent = sv.profiles_dir ? `Perfis salvos em: ${sv.profiles_dir}` : "";
+    text = [sv.label, t("vz.s.ready"), sv.gpu, sv.vram_model_gb != null ? t("vz.s.model_uses", { gb: sv.vram_model_gb }) : "",
+            sv.vram_used_gb != null ? t("vz.s.vram", { used: sv.vram_used_gb, total: sv.vram_total_gb }) : "",
+            sv.asr_loaded ? t("vz.s.whisper") : "", sv.busy ? `${sv.busy}…` : "",
+            st.mode === "external" ? t("vz.s.external") : ""].filter(Boolean).join(" · ");
+  } else if (sv.state === "error") { dot = "bad"; text = t("vz.s.error"); banner = `${esc(sv.error)}<br>${t("vz.log_line", { log: st.log }, true)}`; }
+  else { dot = "warn"; text = t("vz.s.loading"); }
+  $("#vzProfilesDir").textContent = sv.profiles_dir ? t("vz.profiles_dir", { dir: sv.profiles_dir }) : "";
   $("#vzDot").className = "dot " + dot;
   $("#vzStatusText").textContent = text;
   $("#vzBanner").hidden = !banner;
@@ -772,7 +807,7 @@ function renderVzStatus() {
   $("#vzPurgeAsr").hidden = !(sv.state === "ready" && sv.asr_loaded);
   // on/off is for the server the app itself runs; "exited" (it crashed) can be turned on again
   const off = st.mode === "stopped" || st.mode === "exited";
-  $("#vzPower").textContent = off ? "Ligar modelo" : "Desligar modelo";
+  $("#vzPower").textContent = off ? t("btn.power_on") : t("btn.power_off");
   $("#vzPower").dataset.action = off ? "start" : "stop";
   $("#vzPower").disabled = !off && st.mode !== "managed";
   $("#vzDrop").classList.toggle("disabled", sv.state !== "ready");
@@ -809,12 +844,10 @@ function vzResetForm() {
 
 function renderScope() {
   if (vz.scope !== "global" && !vz.profiles.some(p => p.id === vz.scope)) { vz.scope = "global"; vzResetForm(); }
-  $("#vzScope").innerHTML = `<option value="global">Padrão global (todos os perfis)</option>` +
-    vz.profiles.map(p => `<option value="${esc(p.id)}">Só o perfil: ${esc(p.name)}</option>`).join("");
+  $("#vzScope").innerHTML = `<option value="global">${esc(t("vz.scope_global"))}</option>` +
+    vz.profiles.map(p => `<option value="${esc(p.id)}">${esc(t("vz.scope_profile", { name: p.name }))}</option>`).join("");
   $("#vzScope").value = vz.scope;
-  $("#vzScopeHint").textContent = vz.scope === "global"
-    ? "Vale para todos os perfis. ↺ volta ao padrão do modelo."
-    : "Vale só para este perfil. Campos esmaecidos herdam o valor global; ↺ volta a herdar.";
+  $("#vzScopeHint").textContent = vz.scope === "global" ? t("vz.scope_hint_global") : t("vz.scope_hint_profile");
 }
 
 function inherited(p) {
@@ -826,18 +859,24 @@ function fmt(p, v) {
   return Number(v).toFixed(p.step < 0.1 ? 2 : p.step < 1 ? 1 : 0);
 }
 
+// The voice server sends labels and help in one language; the catalog's "param.<key>.label|help" wins when it has the key.
+function paramText(p, field) {
+  const key = `param.${p.key}.${field}`, text = t(key);
+  return text === key ? p[field] : text;
+}
+
 function paramHtml(p) {
   const over = p.key in vz.form, val = over ? vz.form[p.key] : inherited(p);
   let ctl;
-  if (p.type === "bool") ctl = `<input type="checkbox" data-param="${p.key}" ${val ? "checked" : ""}> <span class="hint">${val ? "ligado" : "desligado"}</span>`;
+  if (p.type === "bool") ctl = `<input type="checkbox" data-param="${p.key}" ${val ? "checked" : ""}> <span class="hint">${val ? t("vz.on") : t("vz.off")}</span>`;
   else if (p.type === "select") ctl = `<select data-param="${p.key}">${p.options.map(o =>
     `<option value="${esc(o.value)}" ${o.value === val ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
   else if (p.type === "text") ctl = `<input type="text" data-param="${p.key}" value="${esc(val ?? "")}">`;
   else ctl = `<input type="range" data-param="${p.key}" min="${p.min}" max="${p.max}" step="${p.step ?? (p.type === "int" ? 1 : 0.01)}" value="${val}"><output>${fmt(p, val)}</output>`;
   return `<div class="param ${over || vz.scope === "global" ? "" : "inherited"}">
-    <span class="label ${over ? "overridden" : ""}">${esc(p.label)}</span>
-    <button class="icon reset ${over ? "show" : ""}" data-reset="${p.key}" title="${vz.scope === "global" ? "voltar ao padrão do modelo" : "voltar a herdar o valor global"}">↺</button>
-    <div class="ctl">${ctl}</div>${p.help ? `<div class="help">${esc(p.help)}</div>` : ""}</div>`;
+    <span class="label ${over ? "overridden" : ""}">${esc(paramText(p, "label"))}</span>
+    <button class="icon reset ${over ? "show" : ""}" data-reset="${p.key}" title="${esc(vz.scope === "global" ? t("tip.reset_global") : t("tip.reset_inherit"))}">↺</button>
+    <div class="ctl">${ctl}</div>${paramText(p, "help") ? `<div class="help">${esc(paramText(p, "help"))}</div>` : ""}</div>`;
 }
 
 function renderParams() {
@@ -868,20 +907,20 @@ function vzParamInput(e) {
   $(".reset", row).classList.add("show");
   const out = $("output", row);
   if (out) out.textContent = fmt(p, v);
-  if (p.type === "bool") $(".ctl .hint", row).textContent = v ? "ligado" : "desligado";
+  if (p.type === "bool") $(".ctl .hint", row).textContent = v ? t("vz.on") : t("vz.off");
 }
 
 async function vzSave() {
   try {
     if (vz.scope === "global") vz.settings = await api("/api/tts/settings", jsonOpts("PUT", { params: vz.form }));
     else { await api(`/api/tts/profiles/${vz.scope}`, jsonOpts("PATCH", { params: vz.form })); await vzReloadProfiles(); }
-    vzResetForm(); renderParams(); toast("parâmetros salvos");
+    vzResetForm(); renderParams(); toast(t("toast.params_saved"));
   } catch (e) { toast(e.message, true); }
 }
 
 function vzSetScope(scope) {
   if (scope === vz.scope) return;
-  if (vz.dirty && !confirm("Descartar as mudanças não salvas nos parâmetros?")) { $("#vzScope").value = vz.scope; return; }
+  if (vz.dirty && !confirm(t("confirm.discard_params"))) { $("#vzScope").value = vz.scope; return; }
   vz.scope = scope;
   vzResetForm(); renderScope(); renderParams();
 }
@@ -903,7 +942,7 @@ function resetPipeline() {
 }
 
 async function vzHandleFile(file) {
-  if (vz.status?.server?.state !== "ready") return toast("o servidor de voz ainda não está pronto", true);
+  if (vz.status?.server?.state !== "ready") return toast(t("toast.server_not_ready"), true);
   resetPipeline();
   setStep("prepare", "running", file.name);
   const q = new URLSearchParams({ trim: $("#vzTrim").checked ? 1 : 0, normalize: $("#vzNorm").checked ? 1 : 0,
@@ -917,15 +956,15 @@ async function vzHandleFile(file) {
   $("#vzDraftAudio").src = `/api/tts${d.url}`;
   $("#vzName").value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
   if ($("#vzAuto").checked) {
-    setStep("transcribe", "running", "Whisper (a primeira vez demora ~20s)");
+    setStep("transcribe", "running", t("step.whisper_wait"));
     try {
       const t = await api(`/api/tts/pipeline/${d.draft_id}/transcribe`, { method: "POST" });
       if (vz.draft !== d) return;
       $("#vzRefText").value = t.text;
       setStep("transcribe", "done", `${t.seconds}s`);
     } catch (e) { setStep("transcribe", "error", e.message); }
-  } else setStep("transcribe", "done", "pulado — digite abaixo");
-  setStep("review", "running", "confira o texto e o nome");
+  } else setStep("transcribe", "done", t("step.skipped"));
+  setStep("review", "running", t("step.review_hint"));
   $("#vzRefText").focus();
 }
 
@@ -933,14 +972,14 @@ async function vzCreate() {
   const d = vz.draft;
   if (!d) return;
   const name = $("#vzName").value.trim(), ref_text = $("#vzRefText").value.trim();
-  if (!ref_text) return toast("a transcrição é obrigatória", true);
-  if (!name) return toast("dê um nome ao perfil", true);
+  if (!ref_text) return toast(t("toast.transcript_required"), true);
+  if (!name) return toast(t("toast.name_required"), true);
   setStep("review", "done"); setStep("create", "running");
   $("#vzCreate").disabled = true;
   try {
     const p = await api("/api/tts/profiles", jsonOpts("POST", { draft_id: d.draft_id, name, ref_text }));
     setStep("create", "done", p.name);
-    toast(`perfil "${p.name}" criado`);
+    toast(t("toast.profile_created", { name: p.name }));
     vz.draft = null; $("#vzDraft").hidden = true;
     await vzReloadProfiles();
     $("#vzTestProfile").value = p.id;
@@ -961,19 +1000,19 @@ function renderProfiles() {
     const own = Object.keys(p.params || {}).length;
     return `<li class="vz-profile" data-profile="${esc(p.id)}">
       <div class="top"><span class="name" title="${esc(p.name)}">${esc(p.name)}</span>
-        <button class="icon" data-vz="play" title="Ouvir a referência">▶</button>
-        <button class="icon" data-vz="params" title="Parâmetros deste perfil">⚙</button>
-        <button class="icon" data-vz="edit" title="Editar nome e transcrição">✎</button>
-        <button class="icon danger" data-vz="delete" title="Apagar">✕</button></div>
-      <div class="meta">${p.duration}s de referência${own ? ` · ${own} parâmetro(s) próprio(s)` : ""}${p.ready ? "" : " · ⚠ voz não gerada"}</div>
+        <button class="icon" data-vz="play" title="${esc(t("tip.play_ref"))}">▶</button>
+        <button class="icon" data-vz="params" title="${esc(t("tip.profile_params"))}">⚙</button>
+        <button class="icon" data-vz="edit" title="${esc(t("tip.profile_edit"))}">✎</button>
+        <button class="icon danger" data-vz="delete" title="${esc(t("tip.profile_delete"))}">✕</button></div>
+      <div class="meta">${esc(t("vz.meta_ref", { seconds: p.duration }))}${own ? ` · ${esc(t("vz.meta_own_params", { count: own }))}` : ""}${p.ready ? "" : ` · ${esc(t("vz.meta_not_ready"))}`}</div>
       ${editing === p.id ? `<div class="edit">
           <input type="text" class="e-name" value="${esc(p.name)}">
           <textarea class="e-text" rows="3">${esc(p.ref_text)}</textarea>
-          <p class="hint">Mudar a transcrição recria a voz do perfil.</p>
-          <div class="row"><button class="primary" data-vz="save-edit">Salvar</button><button data-vz="cancel-edit">Cancelar</button></div>
+          <p class="hint">${esc(t("vz.edit_hint"))}</p>
+          <div class="row"><button class="primary" data-vz="save-edit">${esc(t("btn.save"))}</button><button data-vz="cancel-edit">${esc(t("btn.cancel"))}</button></div>
         </div>` : `<div class="ref">“${esc(p.ref_text)}”</div>`}
-      ${used[p.id] ? `<div class="tags">${used[p.id].map(t =>
-        `<span class="tag" style="--team:${t === "default" ? "var(--muted)" : teamColor(t)}">${t === "default" ? "padrão" : esc(t)}</span>`).join("")}</div>` : ""}
+      ${used[p.id] ? `<div class="tags">${used[p.id].map(tm =>
+        `<span class="tag" style="--team:${tm === "default" ? "var(--muted)" : teamColor(tm)}">${tm === "default" ? esc(t("vz.default")) : esc(teamName(tm))}</span>`).join("")}</div>` : ""}
     </li>`;
   }).join("");
   syncProfilePlay();
@@ -985,7 +1024,7 @@ function syncProfilePlay() {
   document.querySelectorAll("#vzProfiles [data-vz=play]").forEach(b => {
     const on = !profileAudio.paused && b.closest("[data-profile]").dataset.profile === profilePlaying;
     b.textContent = on ? "⏸" : "▶";
-    b.title = on ? "Pausar" : "Ouvir a referência";
+    b.title = on ? t("tip.pause") : t("tip.play_ref");
   });
 }
 for (const ev of ["play", "pause", "ended", "error"]) profileAudio.addEventListener(ev, syncProfilePlay);
@@ -1001,18 +1040,18 @@ async function vzProfileAction(action, id, li) {
   else if (action === "cancel-edit") { editing = null; renderProfiles(); }
   else if (action === "save-edit") {
     const btn = $("[data-vz=save-edit]", li);
-    btn.disabled = true; btn.textContent = "salvando…";
+    btn.disabled = true; btn.textContent = t("btn.saving");
     try {
       await api(`/api/tts/profiles/${id}`, jsonOpts("PATCH", { name: $(".e-name", li).value, ref_text: $(".e-text", li).value }));
-      editing = null; await vzReloadProfiles(); toast("perfil atualizado");
-    } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = "Salvar"; }
+      editing = null; await vzReloadProfiles(); toast(t("toast.profile_updated"));
+    } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = t("btn.save"); }
   } else if (action === "delete") {
     const p = vz.profiles.find(x => x.id === id);
-    if (!confirm(`Apagar o perfil "${p?.name}"?`)) return;
+    if (!confirm(t("confirm.delete_profile", { name: p?.name }))) return;
     try {
       await api(`/api/tts/profiles/${id}`, { method: "DELETE" });
       for (const [t, pid] of Object.entries(state.team_profiles || {})) if (pid === id) await cmd(`teamvoice ${t} none`, { quiet: true });
-      await vzReloadProfiles(); toast("perfil apagado");
+      await vzReloadProfiles(); toast(t("toast.profile_deleted"));
     } catch (e) { toast(e.message, true); }
   }
 }
@@ -1021,7 +1060,7 @@ async function vzProfileAction(action, id, li) {
 
 function renderTestProfiles() {
   const sel = $("#vzTestProfile"), cur = sel.value;
-  sel.innerHTML = `<option value="">sem perfil (voz automática)</option>` +
+  sel.innerHTML = `<option value="">${esc(t("vz.test_no_profile"))}</option>` +
     vz.profiles.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
   sel.value = vz.profiles.some(p => p.id === cur) ? cur : (vz.profiles[0]?.id || "");
 }
@@ -1034,13 +1073,13 @@ async function vzSpeak() {
   if (vz.scope === "global") body.global_params = vz.form;  // preview unsaved global edits
   else if (vz.scope === profile) body.params = vz.form;    // preview unsaved edits of this profile
   const btn = $("#vzSpeak");
-  btn.disabled = true; $("#vzTestInfo").textContent = "gerando…";
+  btn.disabled = true; $("#vzTestInfo").textContent = t("vz.generating");
   try {
     const r = await api("/api/tts/synthesize", jsonOpts("POST", body));
     const audio = $("#vzTestAudio");
     audio.src = URL.createObjectURL(await r.blob());
     audio.hidden = false; audio.play().catch(() => {});  // the player stays visible if autoplay is blocked
-    $("#vzTestInfo").textContent = `${r.headers.get("x-audio-seconds")}s de áudio gerados em ${r.headers.get("x-gen-seconds")}s`;
+    $("#vzTestInfo").textContent = t("vz.test_info", { audio: r.headers.get("x-audio-seconds"), gen: r.headers.get("x-gen-seconds") });
   } catch (e) { toast(e.message, true); $("#vzTestInfo").textContent = ""; }
   finally { btn.disabled = false; }
 }
@@ -1050,17 +1089,17 @@ async function vzSpeak() {
 function renderTeamVoices() {
   if (!state) return;
   const teams = [...Object.keys(state.teams), "default"];
-  const key = JSON.stringify([teams, state.team_profiles, vz.profiles.map(p => [p.id, p.name])]);
+  const key = JSON.stringify([teams, state.team_profiles, vz.profiles.map(p => [p.id, p.name]), i18n.lang]);
   if (key === vz.teamsKey) return;
   vz.teamsKey = key;
-  $("#vzTeams").innerHTML = teams.map(t => {
-    const none = t === "default" ? "— nenhum (voz automática) —" : "— usar o padrão —";
-    const cur = state.team_profiles?.[t];
-    return `<div class="team-voice" style="--team:${t === "default" ? "var(--text)" : teamColor(t)}">
-      <b>${t === "default" ? "padrão" : esc(t)}</b>
-      <select data-team-voice="${t}"><option value="none">${none}</option>${vz.profiles.map(p =>
+  $("#vzTeams").innerHTML = teams.map(tm => {
+    const none = tm === "default" ? t("vz.team_none_default") : t("vz.team_use_default");
+    const cur = state.team_profiles?.[tm];
+    return `<div class="team-voice" style="--team:${tm === "default" ? "var(--text)" : teamColor(tm)}">
+      <b>${tm === "default" ? esc(t("vz.default")) : esc(teamName(tm))}</b>
+      <select data-team-voice="${tm}"><option value="none">${esc(none)}</option>${vz.profiles.map(p =>
         `<option value="${esc(p.id)}" ${p.id === cur ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>`;
-  }).join("") + `<p class="hint">Quem tem a voz fala com o perfil do seu time. Times sem perfil usam o padrão.</p>`;
+  }).join("") + `<p class="hint">${esc(t("vz.team_voices_hint"))}</p>`;
 }
 
 // -- wiring
@@ -1087,21 +1126,21 @@ $("#vzBanner").addEventListener("click", async (e) => {
   catch (err) { toast(err.message, true); e.target.disabled = false; }
 });
 $("#vzRestart").addEventListener("click", async () => {
-  if (!confirm("Reiniciar o servidor de voz? O modelo será recarregado.")) return;
-  try { vz.status = await api("/api/tts-service/restart", { method: "POST" }); vz.loaded = false; renderVzStatus(); toast("servidor de voz reiniciando"); }
+  if (!confirm(t("confirm.restart"))) return;
+  try { vz.status = await api("/api/tts-service/restart", { method: "POST" }); vz.loaded = false; renderVzStatus(); toast(t("toast.restarting")); }
   catch (e) { toast(e.message, true); }
 });
 $("#vzPurgeAsr").addEventListener("click", async (e) => {
   e.target.disabled = true;
-  try { await api("/api/tts/asr/release", { method: "POST" }); await vzPoll(); toast("Whisper descarregado · VRAM liberada"); }
+  try { await api("/api/tts/asr/release", { method: "POST" }); await vzPoll(); toast(t("toast.whisper_released")); }
   catch (err) { toast(err.message, true); }
   e.target.disabled = false;
 });
 $("#vzPower").addEventListener("click", async (e) => {
   const action = e.target.dataset.action;
-  if (action === "stop" && !confirm("Desligar o modelo de voz? A VRAM é liberada; os goblins ficam sem a voz do OmniVoice até você ligar de novo.")) return;
+  if (action === "stop" && !confirm(t("confirm.power_off"))) return;
   e.target.disabled = true;
-  try { vz.status = await api(`/api/tts-service/${action}`, { method: "POST" }); vz.loaded = false; renderVzStatus(); toast(action === "stop" ? "modelo de voz desligado" : "ligando o modelo de voz"); }
+  try { vz.status = await api(`/api/tts-service/${action}`, { method: "POST" }); vz.loaded = false; renderVzStatus(); toast(action === "stop" ? t("toast.model_off") : t("toast.model_on")); }
   catch (err) { toast(err.message, true); renderVzStatus(); }
 });
 $("#vzEngine").addEventListener("change", (e) => cmd(`engine ${e.target.value}`));

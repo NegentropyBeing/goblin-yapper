@@ -32,7 +32,7 @@ class Config:
             try:
                 self.settings = json.loads(settings_path.read_text(encoding="utf-8"))
             except ValueError:
-                log.warning("settings.json inválido, ignorando")
+                log.warning("settings.json is invalid, ignoring it")
         self.data = deep_merge(json.loads(json.dumps(base or {})), self.settings)
 
     @property

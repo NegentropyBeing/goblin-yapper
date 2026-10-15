@@ -88,7 +88,7 @@ def test_server_engine_reports_http_errors_and_a_server_that_is_down():
                 await Synthesizer(_server_cfg(url)).synthesize("oi", None)
         finally:
             await runner.cleanup()
-        with pytest.raises(RuntimeError, match="fora do ar"):
+        with pytest.raises(RuntimeError, match="is down"):
             await Synthesizer(_server_cfg(url)).synthesize("oi", None)  # nothing listens there anymore
 
     asyncio.run(run())

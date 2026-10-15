@@ -55,9 +55,10 @@ def runtime_dir() -> Path:
 
 class VoiceInstaller:
     STEPS = ("uv", "python", "torch", "omnivoice", "gpu")
-    LABELS = {"uv": "baixando o instalador (uv)", "python": "preparando o Python",
-              "torch": "instalando PyTorch com CUDA (~3 GB)", "omnivoice": "instalando OmniVoice",
-              "gpu": "verificando a GPU"}
+    # English, for the logs and errors; the panel shows these steps in the operator's language (install.step.<id>)
+    LABELS = {"uv": "downloading the installer (uv)", "python": "preparing Python",
+              "torch": "installing PyTorch with CUDA (~3 GB)", "omnivoice": "installing OmniVoice",
+              "gpu": "checking the GPU"}
 
     def __init__(self, root: Path | None = None):
         self.root = root or runtime_dir()
@@ -122,11 +123,11 @@ class VoiceInstaller:
             self.gpu = out.strip().splitlines()[-1] if out.strip() else "?"
             self.marker.write_text(RUNTIME_VERSION)
             self.state, self.step = "done", None
-            log.info("servidor de voz instalado em %s (%s)", self.root, self.gpu)
+            log.info("voice server installed at %s (%s)", self.root, self.gpu)
             if on_done:
                 await on_done()
         except Exception as e:
-            log.exception("falha ao instalar o servidor de voz")
+            log.exception("failed to install the voice server")
             self.state, self.error = "error", str(e) or type(e).__name__
 
     async def _get_uv(self) -> str:
@@ -140,7 +141,7 @@ class VoiceInstaller:
             data = await r.read()
         digest = hashlib.sha256(data).hexdigest()
         if digest != UV_SHA256:
-            raise RuntimeError(f"checksum do uv não confere ({digest}); download corrompido ou adulterado")
+            raise RuntimeError(f"uv checksum mismatch ({digest}); the download is corrupt or was tampered with")
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             member = next(n for n in z.namelist() if n.endswith("uv.exe"))
             uv.parent.mkdir(parents=True, exist_ok=True)
@@ -160,5 +161,5 @@ class VoiceInstaller:
                 out.append(line)
                 self.log.append(line)
         if await proc.wait() != 0:
-            raise RuntimeError(f"{self.LABELS[self.step]} falhou: {out[-1] if out else 'sem saída'}")
+            raise RuntimeError(f"{self.LABELS[self.step]} failed: {out[-1] if out else 'no output'}")
         return "\n".join(out)
