@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.7.0
+
+Windows installers: `Goblin Yapper_0.7.0_x64_en-US.msi` (English) and `Goblin Yapper_0.7.0_x64_pt-BR.msi`
+(Portuguese).
 
 - **Bilingual interface (English / Portuguese).** Pick the language with **Language** at the top right of the panel;
 until you do, the panel follows the system language. The choice is stored in `settings.json` (`ui.language`) and
