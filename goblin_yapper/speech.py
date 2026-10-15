@@ -80,15 +80,22 @@ class SpeechSession:
             self.pending[utt.user] -= 1
             if self._stale(utt):
                 continue
-            parts = await self._render(utt)
-            if not parts or self._stale(utt):
-                continue
-            if not self.stage.clients:
-                log.warning("nenhum overlay conectado; fala descartada: %s", utt.text)
-                continue
-            self.playing = [part for part, _ in parts]
-            self.speaking = lead = self.playing[0]
-            self.ended.clear()
+            try:
+                await self._voice(utt)
+            except Exception:
+                log.exception("erro ao falar: %s", utt.text)  # one bad line must not stop the worker
+
+    async def _voice(self, utt: Utterance) -> None:
+        parts = await self._render(utt)
+        if not parts or self._stale(utt):
+            return
+        if not self.stage.clients:
+            log.warning("nenhum overlay conectado; fala descartada: %s", utt.text)
+            return
+        self.playing = [part for part, _ in parts]
+        self.speaking = lead = self.playing[0]
+        self.ended.clear()
+        try:
             # Everyone gets each line (to animate); exactly one overlay is told to play its audio.
             players = {part.id: self.stage.pick_player(part.team) for part in self.playing}
             self._awaiting = {i for i, ws in players.items() if ws is not None}
@@ -103,18 +110,21 @@ class SpeechSession:
                     await self.stage.send(ws, {**msg, "play": ws is players[part.id]})
             if not has_player:
                 await self.stage.broadcast({"type": "notice", "text":
-                                      f"nenhum overlay com áudio para {'o time ' + lead.team if lead.team else 'quem está sem time'}"})
+                                            f"nenhum overlay com áudio para {'o time ' + lead.team if lead.team else 'quem está sem time'}"})
             try:
                 # without a player nobody will report the end: just animate for the clip's length
                 await asyncio.wait_for(self.ended.wait(),
                                        timeout=max(wav_duration(wav) for _, wav in parts) + (3 if has_player else 0))
             except asyncio.TimeoutError:
                 log.debug("overlay não confirmou fim do áudio %s", lead.id)
+        finally:
+            # also when a broadcast fails or the worker is cancelled: never leave the line "speaking"
             self.speaking, self.playing = None, []
             self._awaiting.clear()
             for part, _ in parts:
                 self.audio.pop(part.id, None)
-                await self.stage.broadcast({"type": "idle", "id": part.id})
+        for part, _ in parts:
+            await self.stage.broadcast({"type": "idle", "id": part.id})
 
     async def _render(self, utt: Utterance) -> list[tuple[Utterance, bytes]]:
         """The line's audio as (line, wav) pairs: itself, or one copy per team for a chorus (generated
