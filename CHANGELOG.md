@@ -12,7 +12,9 @@ values, so a client can translate them. Logs and the console are in English.
 `docs/TESTE` (the test guide now exists in English).
 - **Testar voz** / **Test voice** and the test box speak in the interface language (a `[tts] test_phrase` in your
 `config.toml` still wins; remove it to follow the language). `POST /api/command` accepts an optional `language`.
-- The Windows installer is still Portuguese only.
+- **The Windows installer comes in two files**, one per language: `Goblin Yapper_<version>_x64_en-US.msi` and
+`Goblin Yapper_<version>_x64_pt-BR.msi` (`bundle.windows.wix.language` is a list now). Both install the same app; the
+file only sets the language of the installer itself.
 
 ## v0.6.1
 
