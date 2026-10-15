@@ -68,7 +68,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         return handler
 
     async def audio(request):
-        wav = app.audio.get(int(request.match_info["id"]))
+        wav = app.speech.audio.get(int(request.match_info["id"]))
         if wav is None:
             raise web.HTTPNotFound()
         return web.Response(body=wav, content_type="audio/wav")
@@ -135,38 +135,36 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
                 await app.broadcast(app.state())
         return ws
 
+    def service():
+        if app.tts.service is None:
+            raise web.HTTPServiceUnavailable(text="servidor TTS desativado")
+        return app.tts.service
+
     async def tts_service_status(_):
-        if app.tts_service is None:
+        if app.tts.service is None:
             return web.json_response({"mode": "disabled"})
-        return web.json_response(await app.tts_service.status())
+        return web.json_response(await app.tts.service.status())
 
-    async def tts_service_restart(_):
-        try:
-            await app.tts_service.restart()
-        except RuntimeError as e:
-            raise web.HTTPConflict(text=str(e))
-        return web.json_response(await app.tts_service.status())
-
-    async def tts_service_stop(_):
-        try:
-            await app.tts_service.turn_off()
-        except RuntimeError as e:
-            raise web.HTTPConflict(text=str(e))
-        return web.json_response(await app.tts_service.status())
-
-    async def tts_service_start(_):
-        await app.tts_service.start()
-        return web.json_response(await app.tts_service.status())
+    def service_action(method: str):
+        async def handler(_):
+            svc = service()
+            try:
+                await getattr(svc, method)()
+            except RuntimeError as e:
+                raise web.HTTPConflict(text=str(e))
+            return web.json_response(await svc.status())
+        return handler
 
     async def tts_service_install(_):
+        svc = service()
         try:
-            app.tts_service.install()
+            svc.install()
         except RuntimeError as e:
             raise web.HTTPConflict(text=str(e))
-        return web.json_response(await app.tts_service.status())
+        return web.json_response(await svc.status())
 
     async def tts_proxy(request):
-        svc = app.tts_service
+        svc = app.tts.service
         if svc is None or svc.session is None:
             raise web.HTTPServiceUnavailable(text="servidor TTS desativado")
         url = f"{svc.url}/{request.match_info['tail']}"
@@ -193,9 +191,9 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         web.post("/api/command", command),
         web.get("/ws", ws_handler),
         web.get("/api/tts-service", tts_service_status),
-        web.post("/api/tts-service/restart", tts_service_restart),
-        web.post("/api/tts-service/stop", tts_service_stop),
-        web.post("/api/tts-service/start", tts_service_start),
+        web.post("/api/tts-service/restart", service_action("restart")),
+        web.post("/api/tts-service/stop", service_action("turn_off")),
+        web.post("/api/tts-service/start", service_action("start")),
         web.post("/api/tts-service/install", tts_service_install),
         web.route("*", "/api/tts/{tail:.*}", tts_proxy),
         web.static("/assets", assets_dir),

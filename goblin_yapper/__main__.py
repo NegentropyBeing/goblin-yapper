@@ -1,4 +1,4 @@
-"""python -m goblin_yapper [--data-dir DIR] [--channel name] [--port N] [--no-chat] [--no-console]
+"""python -m goblin_yapper [--data-dir DIR] [--channel name] [--port N] [--no-chat] [--no-console] [--open]
 
 The data dir holds config.toml (created from the default on first run), settings.json
 (changes made in the panel), assets/ (goblin images), voices/, scripts/ and the log.
@@ -14,6 +14,7 @@ import os
 import shutil
 import sys
 import tomllib
+import webbrowser
 from pathlib import Path
 
 from aiohttp import web
@@ -22,7 +23,6 @@ from .app import App
 from .teams import SorterError
 from .server import make_web_app
 from .tts import TTS
-from .tts_service import TTSService
 
 log = logging.getLogger("goblin_yapper")
 
@@ -71,16 +71,9 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
         log.info("config criado em %s", config_path)
     cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
-    tts = TTS(cfg.get("tts", {}))
-    app = App(cfg, tts, settings_path=data_dir / "settings.json")
-    # settings.json (merged into app.cfg) may pick another engine than config.toml
-    tts.cfg = app.cfg.get("tts", {})
-    tts.engine = tts._make(tts.cfg.get("engine", "dummy"))
-    await tts.load()
-
-    app.tts_service = TTSService(tts.cfg.get("server", {}), data_dir)
-    if app.tts_service.autostart:
-        await app.tts_service.start()
+    tts = TTS(cfg.get("tts", {}), data_dir)
+    app = App(cfg, tts, settings_path=data_dir / "settings.json")  # settings.json is merged in and applied to tts
+    await tts.start()
 
     srv = app.cfg.get("server", {})
     host, port = args.host or srv.get("host", "127.0.0.1"), args.port or int(srv.get("port", 8765))
@@ -88,8 +81,10 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     await runner.setup()
     await web.TCPSite(runner, host, port).start()
     log.info("painel: http://%s:%s/panel  |  overlay: http://%s:%s/overlay", host, port, host, port)
+    if args.open:
+        webbrowser.open(f"http://{host}:{port}/panel")
 
-    worker = asyncio.create_task(app.speech_worker())
+    worker = asyncio.create_task(app.speech.run())
     timers = asyncio.create_task(app.timers())
     if args.parent_pid:
         watchdog = asyncio.create_task(watch_parent(args.parent_pid))  # noqa: F841 (kept alive by the loop)
@@ -109,7 +104,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
         timers.cancel()
         if app.chat_task:
             app.chat_task.cancel()
-        await app.tts_service.close()
+        await tts.close()
         await runner.cleanup()
 
 
@@ -129,6 +124,7 @@ def cli() -> None:
     p.add_argument("--port", type=int)
     p.add_argument("--no-chat", action="store_true", help="não conectar ao chat (testes)")
     p.add_argument("--no-console", action="store_true", help="sem console interativo (modo app)")
+    p.add_argument("--open", action="store_true", help="abre o painel no navegador ao iniciar")
     p.add_argument("--parent-pid", type=int, help="encerra quando este processo terminar (usado pelo app)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()

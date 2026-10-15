@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 import os
 import re
@@ -34,7 +33,6 @@ import shutil
 import sys
 import threading
 import time
-import unicodedata
 from pathlib import Path
 
 from aiohttp import web
@@ -42,14 +40,10 @@ from aiohttp import web
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import audio  # noqa: E402
 from engines import get_engine  # noqa: E402
+from profiles import ProfileError, ProfileStore, Params  # noqa: E402
 
 log = logging.getLogger("tts_server")
 ASR_IDLE_SECONDS = 300
-
-
-def slugify(name: str) -> str:
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")[:32] or "voz"
 
 
 class TTSServer:
@@ -57,11 +51,11 @@ class TTSServer:
         self.data_dir = data_dir
         self.profiles_dir = data_dir / "profiles"
         self.drafts_dir = data_dir / "drafts"
-        self.settings_path = data_dir / "settings.json"
-        self.profiles_dir.mkdir(parents=True, exist_ok=True)
         shutil.rmtree(self.drafts_dir, ignore_errors=True)  # drafts don't survive restarts
         self.drafts_dir.mkdir(parents=True)
         self.engine = get_engine(engine_name)(engine_cfg)
+        self.params = Params(self.engine.params, data_dir / "settings.json")
+        self.profiles = ProfileStore(self.profiles_dir, self.engine.profile_cache, self.params, self.engine.name)
         self.state, self.error = "loading", None
         self.busy = None  # what the GPU is doing right now
         self.lock = asyncio.Lock()
@@ -95,56 +89,6 @@ class TTSServer:
                 return await asyncio.to_thread(fn, *args)
             finally:
                 self.busy = None
-
-    # ---- settings / params ---------------------------------------------
-
-    def settings(self) -> dict:
-        try:
-            return json.loads(self.settings_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {"params": {}}
-
-    def resolve_params(self, *layers: dict) -> dict:
-        out = {}
-        for p in self.engine.params():
-            value = p.default
-            for layer in (self.settings().get("params", {}), *layers):
-                if layer.get(p.key) is not None:
-                    value = layer[p.key]
-            out[p.key] = p.coerce(value)
-        return out
-
-    def clean_params(self, params: dict) -> dict:
-        """Keep only known keys (coerced); None removes an override."""
-        known = {p.key: p for p in self.engine.params()}
-        return {k: known[k].coerce(v) for k, v in (params or {}).items() if k in known and v is not None}
-
-    # ---- profiles ------------------------------------------------------
-
-    def profile_dir(self, pid: str) -> Path:
-        d = self.profiles_dir / pid
-        if not re.fullmatch(r"[a-z0-9-]+", pid) or not (d / "profile.json").exists():
-            raise web.HTTPNotFound(text=f"perfil não encontrado: {pid}")
-        return d
-
-    def read_profile(self, pid: str) -> dict:
-        d = self.profile_dir(pid)
-        meta = json.loads((d / "profile.json").read_text(encoding="utf-8"))
-        meta["ready"] = (d / self.engine.profile_cache).exists()
-        return meta
-
-    def write_profile(self, meta: dict) -> None:
-        d = self.profiles_dir / meta["id"]
-        d.mkdir(exist_ok=True)
-        clean = {k: v for k, v in meta.items() if k != "ready"}
-        (d / "profile.json").write_text(json.dumps(clean, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    def list_profiles(self) -> list[dict]:
-        out = []
-        for d in sorted(self.profiles_dir.iterdir()):
-            if (d / "profile.json").exists():
-                out.append(self.read_profile(d.name))
-        return sorted(out, key=lambda m: m.get("created", 0))
 
     def schedule_asr_release(self) -> None:
         if self._asr_timer:
@@ -185,14 +129,12 @@ def make_app(srv: TTSServer) -> web.Application:
 
     @routes.get("/settings")
     async def get_settings(_):
-        return web.json_response(srv.settings())
+        return web.json_response(srv.params.settings())
 
     @routes.put("/settings")
     async def put_settings(request):
         body = await request.json()
-        settings = {"params": srv.clean_params(body.get("params", {}))}
-        srv.settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
-        return web.json_response(settings)
+        return web.json_response(srv.params.save(body.get("params", {})))
 
     # -- pipeline: prepare -> transcribe -> create
 
@@ -230,34 +172,22 @@ def make_app(srv: TTSServer) -> web.Application:
     async def create_profile(request):
         body = await request.json()
         d = draft_dir(str(body.get("draft_id", "")))
-        name = str(body.get("name", "")).strip()
-        ref_text = str(body.get("ref_text", "")).strip()
-        if not name or not ref_text:
-            raise web.HTTPBadRequest(text="nome e transcrição são obrigatórios")
-        pid = f"{slugify(name)}-{secrets.token_hex(2)}"
-        pdir = srv.profiles_dir / pid
-        pdir.mkdir()
-        shutil.copyfile(d / "reference.wav", pdir / "reference.wav")
+
+        async def build(wav, ref_text, cache):
+            await srv.gpu("criando perfil", srv.engine.build_profile, wav, ref_text, cache)
+
         try:
-            await srv.gpu("criando perfil", srv.engine.build_profile, pdir / "reference.wav", ref_text,
-                          pdir / srv.engine.profile_cache)
+            meta = await srv.profiles.create(d, str(body.get("name", "")), str(body.get("ref_text", "")),
+                                             body.get("params", {}), build)
+        except (web.HTTPException, ProfileError):
+            raise
         except Exception as e:
-            shutil.rmtree(pdir, ignore_errors=True)
-            if isinstance(e, web.HTTPException):
-                raise
             log.exception("falha ao criar perfil")
             raise web.HTTPInternalServerError(text=f"falha ao criar perfil: {e}")
-        import soundfile as sf
-
-        meta = {"id": pid, "name": name, "ref_text": ref_text, "created": time.time(),
-                "duration": round(sf.info(str(pdir / "reference.wav")).duration, 2),
-                "engine": srv.engine.name, "params": srv.clean_params(body.get("params", {}))}
-        srv.write_profile(meta)
-        shutil.rmtree(d, ignore_errors=True)
-        log.info("perfil criado: %s (%s)", name, pid)
+        log.info("perfil criado: %s (%s)", meta["name"], meta["id"])
         if srv._asr_timer:  # the draft is done with Whisper: don't hold its VRAM for the idle timeout
             await srv.release_asr_now()
-        return web.json_response(srv.read_profile(pid))
+        return web.json_response(meta)
 
     @routes.post("/asr/release")
     async def release_asr(_):
@@ -266,35 +196,23 @@ def make_app(srv: TTSServer) -> web.Application:
 
     @routes.get("/profiles")
     async def profiles(_):
-        return web.json_response(srv.list_profiles())
+        return web.json_response(srv.profiles.list())
 
     @routes.get("/profiles/{id}/reference.wav")
     async def profile_audio(request):
-        return web.FileResponse(srv.profile_dir(request.match_info["id"]) / "reference.wav")
+        return web.FileResponse(srv.profiles.reference(request.match_info["id"]))
 
     @routes.patch("/profiles/{id}")
     async def update_profile(request):
-        pid = request.match_info["id"]
-        meta = srv.read_profile(pid)
-        body = await request.json()
-        if str(body.get("name", "")).strip():
-            meta["name"] = body["name"].strip()
-        if "params" in body:
-            meta["params"] = srv.clean_params(body["params"])
-        new_text = str(body.get("ref_text", "")).strip()
-        if new_text and new_text != meta["ref_text"]:
-            d = srv.profile_dir(pid)
-            await srv.gpu("recriando perfil", srv.engine.build_profile, d / "reference.wav", new_text,
-                          d / srv.engine.profile_cache)
-            meta["ref_text"] = new_text
-        srv.write_profile(meta)
-        return web.json_response(srv.read_profile(pid))
+        async def build(wav, ref_text, cache):
+            await srv.gpu("recriando perfil", srv.engine.build_profile, wav, ref_text, cache)
+
+        return web.json_response(await srv.profiles.update(request.match_info["id"], await request.json(), build))
 
     @routes.delete("/profiles/{id}")
     async def delete_profile(request):
         pid = request.match_info["id"]
-        name = srv.read_profile(pid).get("name", "?")
-        shutil.rmtree(srv.profile_dir(pid))
+        name = srv.profiles.delete(pid)
         log.info("perfil apagado: %s (%s)", name, pid)  # deletions are permanent, so leave a trace
         return web.json_response({"ok": True})
 
@@ -306,11 +224,9 @@ def make_app(srv: TTSServer) -> web.Application:
             raise web.HTTPBadRequest(text="texto vazio")
         cache, profile_params = None, {}
         if body.get("profile"):
-            meta = srv.read_profile(str(body["profile"]))
-            cache = srv.profile_dir(meta["id"]) / srv.engine.profile_cache
-            profile_params = meta.get("params", {})
+            cache, profile_params = srv.profiles.for_synthesis(str(body["profile"]))
         # "global_params" previews unsaved global settings: they sit below the profile's own params.
-        params = srv.resolve_params(body.get("global_params") or {}, profile_params, body.get("params") or {})
+        params = srv.params.resolve(body.get("global_params") or {}, profile_params, body.get("params") or {})
         t = time.time()
         samples = await srv.gpu("gerando fala", srv.engine.synthesize, text, cache, params)
         gen = time.time() - t
@@ -325,6 +241,8 @@ def make_app(srv: TTSServer) -> web.Application:
             return await handler(request)
         except web.HTTPException:
             raise
+        except ProfileError as e:
+            return web.Response(status=e.status, text=str(e))
         except Exception as e:
             log.exception("erro em %s", request.path)
             raise web.HTTPInternalServerError(text=f"{type(e).__name__}: {e}")
