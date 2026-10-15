@@ -137,8 +137,8 @@ def test_app_flow():
         await app.on_chat(ChatMessage(speaker, speaker, "!comando", {}))
         other = next(u for u in ("ana", "bia", "caio", "duda") if u != speaker)
         await app.on_chat(ChatMessage(other, other, "não sou eu", {}))
-        assert app.speech_q.qsize() == 1
-        utt = app.speech_q.get_nowait()
+        assert app.speech.queue.qsize() == 1
+        utt = app.speech.queue.get_nowait()
         assert utt.text == "oi chat" and utt.team == "azul"
         await app.command(f"remove {speaker}")
         assert app.voice.active is None
@@ -208,7 +208,7 @@ def test_long_messages_are_not_cut():
         app = App({}, TTS({"engine": "dummy"}))
         long_text = "goblin " * 100
         assert await app.say("ana", long_text)
-        assert app.speech_q.get_nowait().text == long_text.strip()
+        assert app.speech.queue.get_nowait().text == long_text.strip()
 
     asyncio.run(run())
 
@@ -273,20 +273,20 @@ def test_multi_mode_one_speaker_per_team():
         await app.on_chat(ChatMessage(speakers["verde"], "V", "oi do verde", {}))
         other = next(u for u in ("a1", "a2") if u != speakers["azul"])
         await app.on_chat(ChatMessage(other, "X", "não falo", {}))
-        assert app.speech_q.qsize() == 2
+        assert app.speech.queue.qsize() == 2
 
         # next on azul replaces only azul's speaker
         await app.command("next azul")
         assert app.voice.speaker_of("azul") == other
         assert app.voice.speaker_of("verde") == speakers["verde"]
         # the old azul speaker's queued line was dropped, verde's kept
-        assert [u.user for u in app.speech_q._queue] == [speakers["verde"]]
+        assert [u.user for u in app.speech.queue._queue] == [speakers["verde"]]
 
         # stop one team, then everyone
         assert (await app.command("stop verde")).startswith("voz retirada de")
         assert [t for _, t in app.voice.speakers()] == ["azul"]
         await app.command("stop")
-        assert app.voice.speakers() == [] and app.speech_q.qsize() == 0
+        assert app.voice.speakers() == [] and app.speech.queue.qsize() == 0
 
     asyncio.run(run())
 
@@ -303,12 +303,12 @@ def test_multivoice_toggle_and_per_speaker_queue_limit(tmp_path):
             await app.on_chat(ChatMessage("a1", "A", f"azul {i}", {}))
         await app.on_chat(ChatMessage("v1", "V", "verde ainda fala", {}))
         # a1 is capped at 2 queued lines, v1 still gets in
-        assert [u.user for u in app.speech_q._queue] == ["a1", "a1", "v1"]
+        assert [u.user for u in app.speech.queue._queue] == ["a1", "a1", "v1"]
         assert json.loads(settings.read_text(encoding="utf-8"))["voice"]["multi"] is True
 
         await app.command("multivoice off")  # keeps only the most recent speaker
         assert app.voice.users == ["v1"]
-        assert [u.user for u in app.speech_q._queue] == ["v1"]
+        assert [u.user for u in app.speech.queue._queue] == ["v1"]
         assert (await app.command("multivoice talvez")).startswith("erro")
 
     asyncio.run(run())
@@ -341,12 +341,12 @@ def test_pick_player_routing():
 def _run_one_line(app, team):
     """Queue one test line, let the worker send it, acknowledge it, return when idle."""
     async def run():
-        worker = asyncio.create_task(app.speech_worker())
+        worker = asyncio.create_task(app.speech.run())
         await app.say("teste", "oi", team=team)
         for _ in range(200):
             await asyncio.sleep(0.01)
-            if app.speaking:
-                app.on_audio_ended(app.speaking.id)
+            if app.speech.speaking:
+                app.on_audio_ended(app.speech.speaking.id)
                 break
         await asyncio.sleep(0.05)
         worker.cancel()
@@ -387,7 +387,7 @@ def test_testvoice_uses_the_team_phrase_and_profile():
         app = App({"teams": {"count": 2}, "tts": {"test_phrase": "Oi, time {team}!"}}, TTS({"engine": "dummy"}))
         await app.command("teamvoice verde goblin-verde-1")
         assert (await app.command("testvoice verde")) == "testando a voz do time verde"
-        utt = app.speech_q.get_nowait()
+        utt = app.speech.queue.get_nowait()
         assert (utt.text, utt.team, utt.chat) == ("Oi, time verde!", "verde", False)
         assert app.tts.voice_for(utt.team)["profile"] == "goblin-verde-1"
         assert (await app.command("testvoice roxo")).startswith("erro")  # only 2 teams active
@@ -467,10 +467,10 @@ def test_voice_rotates_inside_the_team_after_the_limit():
         await app.tick()
         assert app.voice.active == first  # off by default
         assert (await app.command("autorotate on 5")) == "a voz troca de pessoa a cada 5 min"
-        app.speaking = type("U", (), {"user": first, "id": 1, "team": "azul"})()  # their line is playing: wait
+        app.speech.speaking = type("U", (), {"user": first, "id": 1, "team": "azul"})()  # their line is playing: wait
         await app.tick()
         assert app.voice.active == first
-        app.speaking = None
+        app.speech.speaking = None
         await app.tick()
         second = app.voice.active
         assert second != first and app.voice.active_team == "azul"
@@ -536,11 +536,11 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
         engine = app.tts.engine = StuckEngine(reentrant)
         ws = FakeWS()
         app.clients.add(ws)
-        worker = asyncio.create_task(app.speech_worker())
+        worker = asyncio.create_task(app.speech.run())
         assert (await app.command("skip")).startswith("erro")  # nothing in progress
         await app.say("ana", "travada")
         await app.say("bia", "segunda")
-        await _until(lambda: app.generating is not None and engine.calls)
+        await _until(lambda: app.speech.generating is not None and engine.calls)
         assert app.state()["generating"] == {"user": "ana", "team": None}
         assert "pulada" in await app.command("skip")
         spoken = lambda: [m["text"] for m in ws.sent if m["type"] == "speak"]  # noqa: E731
@@ -555,7 +555,7 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
         # skipping a line that is playing ends it and tells the players to stop
         speak = next(m for m in ws.sent if m["type"] == "speak")
         assert "pulada" in await app.command("skip")
-        await _until(lambda: app.speaking is None)
+        await _until(lambda: app.speech.speaking is None)
         assert {"type": "stop", "id": speak["id"]} in ws.sent
         engine.release.set()
         worker.cancel()
@@ -567,11 +567,11 @@ def test_stop_also_frees_a_generation_in_progress():
     async def run():
         app = App({}, TTS({"engine": "dummy"}))
         engine = app.tts.engine = StuckEngine(True)
-        worker = asyncio.create_task(app.speech_worker())
+        worker = asyncio.create_task(app.speech.run())
         await app.say("ana", "travada")
-        await _until(lambda: app.generating is not None and engine.calls)
+        await _until(lambda: app.speech.generating is not None and engine.calls)
         await app.command("stop")
-        await _until(lambda: app.generating is None)
+        await _until(lambda: app.speech.generating is None)
         engine.release.set()
         worker.cancel()
 
@@ -601,41 +601,41 @@ def test_chorus_every_team_voice_says_the_phrase_together():
         calls = []
         synth = app.tts.engine.synthesize
         app.tts.engine.synthesize = lambda text, voice: calls.append(voice.get("profile")) or synth(text, voice)
-        worker = asyncio.create_task(app.speech_worker())
+        worker = asyncio.create_task(app.speech.run())
         speaks = lambda name: [m for m in s[name].sent if m["type"] == "speak"]
 
         # someone else sending the glyph (even with the voice) doesn't start it
         await app.on_chat(ChatMessage("outro", "Outro", CHORUS_TRIGGER, {}))
-        assert app.speech_q.empty()
+        assert app.speech.queue.empty()
 
         # the one chatter does, without being in the game
         await app.on_chat(ChatMessage("NegentropyBeing", "NegentropyBeing", CHORUS_TRIGGER, {}))
-        await _until(lambda: len(app.playing) == 2)
+        await _until(lambda: len(app.speech.playing) == 2)
         await asyncio.sleep(0.02)
         assert len(calls) == 2  # one clip per team, even with the same voice settings
         lines = speaks("panel")
         assert [m["team"] for m in lines] == ["azul", "verde"] and len({m["id"] for m in lines}) == 2
-        assert all(m["text"] == CHORUS_TEXT and m["id"] in app.audio for m in lines)
+        assert all(m["text"] == CHORUS_TEXT and m["id"] in app.speech.audio for m in lines)
         # each team's clip goes to its own source, or to the main one
         assert [m["play"] for m in speaks("azul")] == [True, False]
         assert [m["play"] for m in speaks("main")] == [False, True]
         # the line is over only when every player has finished
         app.on_audio_ended(lines[0]["id"])
         await asyncio.sleep(0.03)
-        assert app.speaking is not None
+        assert app.speech.speaking is not None
         app.on_audio_ended(lines[1]["id"])
-        await _until(lambda: app.speaking is None)
+        await _until(lambda: app.speech.speaking is None)
         await asyncio.sleep(0.02)
         assert [m["id"] for m in s["panel"].sent if m["type"] == "idle"] == [m["id"] for m in lines]
-        assert not app.audio
+        assert not app.speech.audio
 
         # again: the clips are reused, and skip cuts all of them
         await app.on_chat(ChatMessage("negentropybeing", "NegentropyBeing", CHORUS_TRIGGER, {}))
-        await _until(lambda: len(app.playing) == 2)
+        await _until(lambda: len(app.speech.playing) == 2)
         assert len(calls) == 2  # one clip per team, even with the same voice settings
-        ids = [u.id for u in app.playing]
+        ids = [u.id for u in app.speech.playing]
         assert not (await app.command("skip")).startswith("erro")
-        await _until(lambda: app.speaking is None)
+        await _until(lambda: app.speech.speaking is None)
         assert [m["id"] for m in s["panel"].sent if m["type"] == "stop"] == ids
         worker.cancel()
 

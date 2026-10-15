@@ -68,7 +68,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         return handler
 
     async def audio(request):
-        wav = app.audio.get(int(request.match_info["id"]))
+        wav = app.speech.audio.get(int(request.match_info["id"]))
         if wav is None:
             raise web.HTTPNotFound()
         return web.Response(body=wav, content_type="audio/wav")

@@ -84,7 +84,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     if args.open:
         webbrowser.open(f"http://{host}:{port}/panel")
 
-    worker = asyncio.create_task(app.speech_worker())
+    worker = asyncio.create_task(app.speech.run())
     timers = asyncio.create_task(app.timers())
     if args.parent_pid:
         watchdog = asyncio.create_task(watch_parent(args.parent_pid))  # noqa: F841 (kept alive by the loop)
