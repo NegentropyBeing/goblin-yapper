@@ -24,7 +24,7 @@ $tts = Join-Path $root "tts_server"  # only its code is bundled; the voice runti
     --name "goblin-yapper-server-$triple" `
     --add-data "$pkg\web;goblin_yapper\web" `
     --add-data "$pkg\default_config.toml;goblin_yapper" `
-    --add-data "$tts\server.py;tts_server" --add-data "$tts\audio.py;tts_server" `
+    --add-data "$tts\server.py;tts_server" --add-data "$tts\audio.py;tts_server" --add-data "$tts\profiles.py;tts_server" `
     --add-data "$tts\requirements.txt;tts_server" --add-data "$tts\engines\*.py;tts_server\engines" `
     --distpath (Join-Path $root "app\src-tauri\binaries") `
     --workpath (Join-Path $root "build") --specpath (Join-Path $root "build") `

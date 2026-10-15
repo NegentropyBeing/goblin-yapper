@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.6.1
+
+Windows installer: `Goblin Yapper_0.6.1_x64_pt-BR.msi`.
+
+- Fixed: the voice server crashed on start in v0.6.0 (`No module named 'profiles'`) because the installer left
+`profiles.py` out of the voice runtime, so the panel showed "o servidor de voz parou".
+- If the voice server dies, its error output is now written to `tts-server.log`, where the panel points.
+- Test that every `tts_server` module is shipped by the installer, to keep this from happening again.
+
 ## v0.6.0
 
 Windows installer: `Goblin Yapper_0.6.0_x64_pt-BR.msi`.

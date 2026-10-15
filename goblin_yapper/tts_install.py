@@ -38,7 +38,7 @@ TORCH = ["torch==2.8.0+cu128", "torchaudio==2.8.0+cu128"]
 TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
 RUNTIME_VERSION = "1"  # bump when the runtime's packages change, to force a reinstall
 
-SERVER_FILES = ("server.py", "audio.py", "requirements.txt", "engines/__init__.py", "engines/base.py",
+SERVER_FILES = ("server.py", "audio.py", "profiles.py", "requirements.txt", "engines/__init__.py", "engines/base.py",
                 "engines/omnivoice_engine.py")
 
 

@@ -46,6 +46,7 @@ class TTSService:
             self.uses_runtime = True
             self.python, self.script = self.installer.python, self.installer.server_dir / "server.py"
         self.data_dir = data_dir / "tts"
+        self.stderr_path = self.data_dir / "tts-server.stderr"
         self.proc: asyncio.subprocess.Process | None = None
         self.mode = "stopped"  # stopped | managed | external | not_installed | exited
         self.session: aiohttp.ClientSession | None = None
@@ -79,11 +80,13 @@ class TTSService:
             self.installer.sync_server_code()  # the runtime gets this app version's server code
         port = str(urlparse(self.url).port or 8766)
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.proc = await asyncio.create_subprocess_exec(
-            str(self.python), str(self.script), "--data-dir", str(self.data_dir), "--port", port,
-            "--engine", self.engine, "--parent-pid", str(os.getpid()),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        # stderr goes to a file: a crash before the server sets up its own log (a bad import) shows up only there
+        with open(self.stderr_path, "wb") as err:
+            self.proc = await asyncio.create_subprocess_exec(
+                str(self.python), str(self.script), "--data-dir", str(self.data_dir), "--port", port,
+                "--engine", self.engine, "--parent-pid", str(os.getpid()),
+                stdout=subprocess.DEVNULL, stderr=err,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.mode = "managed"
         log.info("servidor TTS iniciado (pid %s), log em %s", self.proc.pid, self.data_dir / "tts-server.log")
         asyncio.get_running_loop().create_task(self._watch(self.proc))
@@ -93,6 +96,17 @@ class TTSService:
         if proc is self.proc:
             self.mode = "exited"
             log.warning("servidor TTS encerrou (código %s); veja %s", code, self.data_dir / "tts-server.log")
+            self._copy_crash_to_log()
+
+    def _copy_crash_to_log(self) -> None:
+        """Put what the dead server wrote to stderr into tts-server.log, where the panel tells the user to look."""
+        try:
+            tail = self.stderr_path.read_text(encoding="utf-8", errors="replace").strip()[-4000:]
+            if tail:
+                with open(self.data_dir / "tts-server.log", "a", encoding="utf-8") as f:
+                    f.write(f"\n--- o servidor encerrou; saída de erro ---\n{tail}\n")
+        except OSError:
+            pass
 
     async def stop(self) -> None:
         proc, self.proc = self.proc, None
