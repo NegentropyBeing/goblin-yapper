@@ -69,9 +69,9 @@ class TTSServer:
             try:
                 self.engine.load()
                 self.state = "ready"
-                log.info("%s pronto em %.1fs", self.engine.label, time.time() - t)
+                log.info("%s ready in %.1fs", self.engine.label, time.time() - t)
             except Exception as e:
-                log.exception("falha ao carregar o modelo")
+                log.exception("failed to load the model")
                 self.state, self.error = "error", f"{type(e).__name__}: {e}"
 
         threading.Thread(target=run, daemon=True).start()
@@ -109,7 +109,7 @@ def make_app(srv: TTSServer) -> web.Application:
     def draft_dir(draft: str) -> Path:
         d = srv.drafts_dir / draft
         if not re.fullmatch(r"[a-f0-9]{12}", draft) or not d.exists():
-            raise web.HTTPNotFound(text="rascunho não encontrado (o servidor reiniciou?)")
+            raise web.HTTPNotFound(text="draft not found (did the server restart?)")
         return d
 
     @routes.get("/status")
@@ -182,9 +182,9 @@ def make_app(srv: TTSServer) -> web.Application:
         except (web.HTTPException, ProfileError):
             raise
         except Exception as e:
-            log.exception("falha ao criar perfil")
+            log.exception("failed to create the profile")
             raise web.HTTPInternalServerError(text=f"falha ao criar perfil: {e}")
-        log.info("perfil criado: %s (%s)", meta["name"], meta["id"])
+        log.info("profile created: %s (%s)", meta["name"], meta["id"])
         if srv._asr_timer:  # the draft is done with Whisper: don't hold its VRAM for the idle timeout
             await srv.release_asr_now()
         return web.json_response(meta)
@@ -213,7 +213,7 @@ def make_app(srv: TTSServer) -> web.Application:
     async def delete_profile(request):
         pid = request.match_info["id"]
         name = srv.profiles.delete(pid)
-        log.info("perfil apagado: %s (%s)", name, pid)  # deletions are permanent, so leave a trace
+        log.info("profile deleted: %s (%s)", name, pid)  # deletions are permanent, so leave a trace
         return web.json_response({"ok": True})
 
     @routes.post("/synthesize")
@@ -231,7 +231,7 @@ def make_app(srv: TTSServer) -> web.Application:
         samples = await srv.gpu("gerando fala", srv.engine.synthesize, text, cache, params)
         gen = time.time() - t
         dur = len(samples) / srv.engine.sample_rate
-        log.info("fala: %.2fs de áudio em %.2fs (%s)", dur, gen, body.get("profile") or "sem perfil")
+        log.info("speech: %.2fs of audio in %.2fs (%s)", dur, gen, body.get("profile") or "no profile")
         return web.Response(body=audio.to_wav(samples, srv.engine.sample_rate), content_type="audio/wav",
                             headers={"X-Gen-Seconds": f"{gen:.2f}", "X-Audio-Seconds": f"{dur:.2f}"})
 
@@ -244,7 +244,7 @@ def make_app(srv: TTSServer) -> web.Application:
         except ProfileError as e:
             return web.Response(status=e.status, text=str(e))
         except Exception as e:
-            log.exception("erro em %s", request.path)
+            log.exception("error in %s", request.path)
             raise web.HTTPInternalServerError(text=f"{type(e).__name__}: {e}")
 
     app = web.Application(middlewares=[errors], client_max_size=50 * 1024 * 1024)
@@ -268,7 +268,7 @@ async def watch_parent(pid: int) -> None:
                 return False
     while alive():
         await asyncio.sleep(2)
-    log.info("processo pai encerrou; saindo")
+    log.info("parent process exited; quitting")
     os._exit(0)
 
 
@@ -278,7 +278,7 @@ async def main(args) -> None:
     runner = web.AppRunner(make_app(srv), access_log=None)
     await runner.setup()
     await web.TCPSite(runner, "127.0.0.1", args.port).start()
-    log.info("servidor TTS em http://127.0.0.1:%s (engine=%s)", args.port, args.engine)
+    log.info("TTS server at http://127.0.0.1:%s (engine=%s)", args.port, args.engine)
     srv.load_in_background()
     if args.parent_pid:
         asyncio.create_task(watch_parent(args.parent_pid))

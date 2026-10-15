@@ -32,7 +32,7 @@ class OmniVoiceEngine(Engine):
         self.torch = torch
         device, dtype = self.cfg.get("device", "cuda:0"), self.cfg.get("dtype", "float16")
         if device.startswith("cuda") and not torch.cuda.is_available():
-            log.warning("sem GPU CUDA; usando a CPU (bem mais lento)")
+            log.warning("no CUDA GPU; using the CPU (much slower)")
             device, dtype = "cpu", "float32"  # float16 is GPU-only in practice
         self.model = OmniVoice.from_pretrained(self.cfg.get("model", "k2-fsa/OmniVoice"),
                                                device_map=device, dtype=getattr(torch, dtype))
@@ -54,38 +54,38 @@ class OmniVoiceEngine(Engine):
 
         by_id = {i: n for n, i in LANG_NAME_TO_ID.items()}
         rest = sorted((i for i in by_id if i not in PINNED_LANGS), key=lambda i: by_id[i])
-        opts = [{"value": "auto", "label": "detectar automaticamente"}]
+        opts = [{"value": "auto", "label": "detect automatically"}]
         opts += [{"value": i, "label": f"{by_id[i].title()} ({i})"} for i in (*PINNED_LANGS, *rest) if i in by_id]
         return opts
 
     def params(self) -> list[Param]:
         langs = getattr(self, "_languages", [{"value": "pt", "label": "Portuguese (pt)"}])
         return [
-            Param("language", "Idioma", "select", "pt", options=langs,
-                  help="Idioma do texto falado. Indicar melhora um pouco a qualidade."),
-            Param("speed", "Velocidade", "float", 1.0, min=0.5, max=2.0, step=0.05,
-                  help="> 1 mais rápido, < 1 mais devagar."),
-            Param("num_step", "Passos de decodificação", "int", 32, min=4, max=64, step=1,
-                  help="Mais passos = mais qualidade, porém mais lento. 16 é ~2x mais rápido."),
-            Param("guidance_scale", "Força do guia (CFG)", "float", 2.0, min=0.0, max=5.0, step=0.1,
-                  help="Quanto o modelo segue o texto e a voz de referência."),
-            Param("denoise", "Remover ruído", "bool", True, help="Pede ao modelo uma saída limpa, sem o ruído da referência."),
-            Param("normalize_text", "Normalizar texto", "bool", False,
-                  help="Converte números, datas e moedas para a forma falada."),
-            Param("instruct", "Estilo de voz (sem perfil)", "text", "",
-                  help="Só quando nenhum perfil é usado. Ex: 'female, low pitch'. Treinado em inglês/chinês."),
+            Param("language", "Language", "select", "pt", options=langs,
+                  help="Language of the spoken text. Setting it improves quality a little."),
+            Param("speed", "Speed", "float", 1.0, min=0.5, max=2.0, step=0.05,
+                  help="> 1 faster, < 1 slower."),
+            Param("num_step", "Decoding steps", "int", 32, min=4, max=64, step=1,
+                  help="More steps = better quality, but slower. 16 is ~2x faster."),
+            Param("guidance_scale", "Guidance strength (CFG)", "float", 2.0, min=0.0, max=5.0, step=0.1,
+                  help="How much the model follows the text and the reference voice."),
+            Param("denoise", "Remove noise", "bool", True, help="Asks the model for clean output, without the reference's noise."),
+            Param("normalize_text", "Normalize text", "bool", False,
+                  help="Turns numbers, dates and currencies into their spoken form."),
+            Param("instruct", "Voice style (no profile)", "text", "",
+                  help="Only when no profile is used. E.g. 'female, low pitch'. Trained on English/Chinese."),
             Param("t_shift", "t_shift", "float", 0.1, group="advanced", min=0.0, max=1.0, step=0.01,
-                  help="Deslocamento do cronograma de decodificação."),
-            Param("layer_penalty_factor", "Penalidade por camada", "float", 5.0, group="advanced", min=0.0, max=20.0, step=0.5),
-            Param("position_temperature", "Temperatura de posição", "float", 5.0, group="advanced", min=0.0, max=20.0, step=0.5),
-            Param("class_temperature", "Temperatura de classe", "float", 0.0, group="advanced", min=0.0, max=2.0, step=0.05,
-                  help="0 = determinístico; maior = mais variação."),
-            Param("postprocess_output", "Pós-processar saída", "bool", True, group="advanced"),
-            Param("audio_chunk_duration", "Duração do trecho (s)", "float", 15.0, group="advanced", min=5.0, max=30.0, step=0.5,
-                  help="Textos longos são gerados em trechos deste tamanho."),
-            Param("audio_chunk_threshold", "Limite para dividir (s)", "float", 30.0, group="advanced", min=10.0, max=120.0, step=1.0,
-                  help="Áudios previstos acima disto são divididos em trechos."),
-            Param("pad_duration", "Silêncio nas pontas (s)", "float", 0.1, group="advanced", min=0.0, max=1.0, step=0.05),
+                  help="Shift of the decoding schedule."),
+            Param("layer_penalty_factor", "Layer penalty", "float", 5.0, group="advanced", min=0.0, max=20.0, step=0.5),
+            Param("position_temperature", "Position temperature", "float", 5.0, group="advanced", min=0.0, max=20.0, step=0.5),
+            Param("class_temperature", "Class temperature", "float", 0.0, group="advanced", min=0.0, max=2.0, step=0.05,
+                  help="0 = deterministic; higher = more variation."),
+            Param("postprocess_output", "Post-process output", "bool", True, group="advanced"),
+            Param("audio_chunk_duration", "Chunk length (s)", "float", 15.0, group="advanced", min=5.0, max=30.0, step=0.5,
+                  help="Long texts are generated in chunks of this size."),
+            Param("audio_chunk_threshold", "Split threshold (s)", "float", 30.0, group="advanced", min=10.0, max=120.0, step=1.0,
+                  help="Audio predicted above this is split into chunks."),
+            Param("pad_duration", "Edge silence (s)", "float", 0.1, group="advanced", min=0.0, max=1.0, step=0.05),
             Param("fade_duration", "Fade (s)", "float", 0.1, group="advanced", min=0.0, max=1.0, step=0.05),
         ]
 
@@ -93,7 +93,7 @@ class OmniVoiceEngine(Engine):
 
     def transcribe(self, wav: Path) -> str:
         if getattr(self.model, "_asr_pipe", None) is None:
-            log.info("carregando Whisper para transcrição...")
+            log.info("loading Whisper for transcription...")
             self.model.load_asr_model()
         # Samples, not the path: given a path, the Whisper pipeline decodes it with ffmpeg, which a
         # clean Windows install does not have.
@@ -110,7 +110,7 @@ class OmniVoiceEngine(Engine):
             self.model._asr_pipe = None
             gc.collect()
             self._trim()
-            log.info("Whisper descarregado (VRAM liberada)")
+            log.info("Whisper unloaded (VRAM freed)")
 
     def _trim(self) -> None:
         """Give PyTorch's cached blocks back to the GPU: the work memory of a job would otherwise stay

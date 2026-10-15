@@ -97,7 +97,7 @@ def test_a_failed_build_leaves_no_profile_and_keeps_the_draft(tmp_path):
 
 def test_create_needs_a_name_and_a_transcript(tmp_path):
     async def run():
-        with pytest.raises(ProfileError, match="obrigatórios"):
+        with pytest.raises(ProfileError, match="are required"):
             await _store(tmp_path).create(_draft(tmp_path), "  ", "texto", {}, _build)
 
     asyncio.run(run())

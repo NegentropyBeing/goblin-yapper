@@ -60,7 +60,7 @@ async def watch_parent(pid: int) -> None:
                 return False
     while alive():
         await asyncio.sleep(2)
-    log.info("app principal encerrou; saindo")
+    log.info("the desktop app exited; quitting")
     os._exit(0)
 
 
@@ -68,7 +68,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     config_path = data_dir / "config.toml"
     if not config_path.exists():
         shutil.copyfile(DEFAULT_CONFIG, config_path)
-        log.info("config criado em %s", config_path)
+        log.info("config created at %s", config_path)
     cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
     tts = TTS(cfg.get("tts", {}), data_dir)

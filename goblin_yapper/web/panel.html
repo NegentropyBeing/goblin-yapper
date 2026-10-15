@@ -870,7 +870,7 @@ function paramHtml(p) {
   let ctl;
   if (p.type === "bool") ctl = `<input type="checkbox" data-param="${p.key}" ${val ? "checked" : ""}> <span class="hint">${val ? t("vz.on") : t("vz.off")}</span>`;
   else if (p.type === "select") ctl = `<select data-param="${p.key}">${p.options.map(o =>
-    `<option value="${esc(o.value)}" ${o.value === val ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+    `<option value="${esc(o.value)}" ${o.value === val ? "selected" : ""}>${esc(o.value === "auto" ? t("param.language.auto") : o.label)}</option>`).join("")}</select>`;
   else if (p.type === "text") ctl = `<input type="text" data-param="${p.key}" value="${esc(val ?? "")}">`;
   else ctl = `<input type="range" data-param="${p.key}" min="${p.min}" max="${p.max}" step="${p.step ?? (p.type === "int" ? 1 : 0.01)}" value="${val}"><output>${fmt(p, val)}</output>`;
   return `<div class="param ${over || vz.scope === "global" ? "" : "inherited"}">
