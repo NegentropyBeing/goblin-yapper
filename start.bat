@@ -1,9 +1,9 @@
 @echo off
-rem Inicia o Goblin Yapper a partir do codigo-fonte (Passo 5 do docs\TESTE.md).
+rem Inicia o Goblin Yapper a partir do codigo-fonte (Passo 5 do docs\TESTE.pt-BR.md).
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
-    echo Ambiente .venv nao encontrado. Siga o Passo 4 do docs\TESTE.md primeiro.
+    echo Ambiente .venv nao encontrado. Siga o Passo 4 do docs\TESTE.pt-BR.md primeiro.
     pause
     exit /b 1
 )

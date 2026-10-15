@@ -1,5 +1,7 @@
 # Guia de teste do Goblin Yapper (do zero)
 
+> **English:** this guide in English: [TESTE.md](TESTE.md).
+
 Este guia leva você de um computador sem nada instalado até o Goblin Yapper funcionando, um passo de cada
 vez. Não precisa saber programar. Siga os passos na ordem e confira o **"Você deve ver"** de cada um antes de
 ir para o próximo. Se algo sair diferente, vá para [Problemas comuns](#problemas-comuns).
@@ -108,13 +110,14 @@ Na mesma janela, rode:
 **Você deve ver**, em alguns segundos, uma lista de comandos e linhas parecidas com estas:
 
 ```
-config criado em C:\goblin-yapper-main\config.toml
-painel: http://127.0.0.1:8765/panel  |  overlay: http://127.0.0.1:8765/overlay
-sem canal da Twitch configurado (use o painel ou: channel <canal>)
+config created at C:\goblin-yapper-main\config.toml
+panel: http://127.0.0.1:8765/panel  |  overlay: http://127.0.0.1:8765/overlay
+no Twitch channel set (use the panel or: channel <channel>)
 >
 ```
 
-O aviso sobre o canal da Twitch e um aviso `servidor de voz não instalado` são normais nesta etapa.
+Essas linhas aparecem em inglês, de propósito. O aviso sobre o canal da Twitch (`no Twitch channel set`) e um aviso
+`voice server not installed` são normais nesta etapa.
 
 **Deixe essa janela aberta.** Ela é o programa rodando. Se você fechar a janela, o Goblin Yapper para.
 
@@ -128,6 +131,9 @@ Abra o navegador (Chrome ou Edge) e entre neste endereço:
 
 **Você deve ver:** uma tela escura com o título **Goblin Yapper**, as abas **Goblin** e **Voz**, uma coluna
 **Fila** e colunas coloridas dos times, cada uma com um goblin.
+
+O painel abre no idioma do Windows. Se aparecer em um idioma que você não quer, troque em **Idioma**, no canto
+superior direito.
 
 Esse endereço só funciona no seu próprio computador e só enquanto a janela do Passo 5 estiver aberta.
 
