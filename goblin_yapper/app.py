@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .teams import QUEUE, SorterError, TeamSorter
+from .config import Config
 from .speech import SpeechSession
 from .tts import TTS
 from .twitch import ChatMessage, read_chat
@@ -34,15 +35,6 @@ def normalize_channel(raw: str) -> str:
     return c.split("/")[0].split("?")[0].lstrip("#@")
 
 DEFAULT_TINTS = {"azul": "#3b82f6", "verde": "#22c55e", "roxo": "#a855f7", "amarelo": "#facc15"}
-
-
-def deep_merge(base: dict, patch: dict) -> dict:
-    for k, v in patch.items():
-        if isinstance(v, dict) and isinstance(base.get(k), dict):
-            deep_merge(base[k], v)
-        else:
-            base[k] = v
-    return base
 
 
 def load_tints(tcfg: dict) -> dict[str, dict]:
@@ -101,13 +93,8 @@ class App:
     voice: VoiceController = field(init=False)
 
     def __post_init__(self):
-        self.settings: dict = {}
-        if self.settings_path and self.settings_path.exists():
-            try:
-                self.settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
-            except ValueError:
-                log.warning("settings.json inválido, ignorando")
-        self.cfg = deep_merge(json.loads(json.dumps(self.cfg)), self.settings)
+        self.config = self.cfg if isinstance(self.cfg, Config) else Config(self.cfg, self.settings_path)
+        self.cfg = self.config.data
         tcfg = self.cfg.get("teams", {})
         self.sorter = TeamSorter(tcfg.get("count", 2), tcfg.get("auto_assign_late", True))
         self.sorter.queue_open = tcfg.get("queue_open_on_start", False)
@@ -137,9 +124,7 @@ class App:
         self._bg_tasks: set[asyncio.Task] = set()
 
     def persist(self, patch: dict) -> None:
-        deep_merge(self.settings, patch)
-        if self.settings_path:
-            self.settings_path.write_text(json.dumps(self.settings, indent=2, ensure_ascii=False), encoding="utf-8")
+        self.config.update(patch)
 
     def _bg(self, coro) -> None:
         task = asyncio.get_running_loop().create_task(coro)
@@ -199,7 +184,7 @@ class App:
             "tts_engine": self.tts.engine.name,
             "tts_error": self.tts.error,
             "team_profiles": self.tts.team_profiles,
-            "data_dir": str(self.settings_path.parent) if self.settings_path else None,
+            "data_dir": str(self.config.data_dir) if self.config.data_dir else None,
         }
 
     async def send(self, ws, msg: dict) -> None:
@@ -457,9 +442,7 @@ class App:
             if team != "default" and team not in self.tints:
                 raise SorterError(f"time desconhecido: {team}")
             self.tts.set_team_profile(team, None if args[1].lower() == "none" else args[1])
-            # replace (not merge) so removals are saved too
-            self.settings.setdefault("tts", {})["team_profiles"] = dict(self.tts.team_profiles)
-            self.persist({})
+            self.config.replace(("tts", "team_profiles"), dict(self.tts.team_profiles))  # replace: removals persist
             return f"voz de {team}: {self.tts.team_profiles.get(team, 'padrão')}"
         if cmd == "channel":
             need(1, "channel <canal|off>")

@@ -173,7 +173,7 @@ def test_channel_normalization():
     async def run():
         app = App({}, TTS({"engine": "dummy"}))
         assert (await app.command("channel https://www.twitch.tv/negentropybeing")) == "chat: #negentropybeing"
-        assert app.settings["twitch"]["channel"] == "negentropybeing"
+        assert app.config.settings["twitch"]["channel"] == "negentropybeing"
         assert (await app.command("channel não-é-canal!")).startswith("erro")
         assert app.channel == "negentropybeing"  # unchanged after a bad name
         await app.command("channel off")
@@ -409,7 +409,7 @@ def _game(cfg=None, people=("ana", "bia", "caio", "duda")):
 def test_inactive_chatters_are_removed_after_the_limit(tmp_path):
     async def run():
         app, people = _game()
-        app.settings_path = tmp_path / "settings.json"
+        app.config.settings_path = tmp_path / "settings.json"
         for name in people:
             await app.on_chat(ChatMessage(name, name.title(), "!joinsort", {}))
         await app.tick()
@@ -420,7 +420,7 @@ def test_inactive_chatters_are_removed_after_the_limit(tmp_path):
         assert len(app.sorter.queue) == 4  # off by default
         assert (await app.command("autoremove on 10")) == "inativos saem após 10 min sem falar no chat"
         assert app.state()["auto_remove"] == {"on": True, "minutes": 10.0}
-        saved = json.loads(app.settings_path.read_text(encoding="utf-8"))["teams"]
+        saved = json.loads(app.config.settings_path.read_text(encoding="utf-8"))["teams"]
         assert saved == {"inactive_remove": True, "inactive_minutes": 10.0}
         app.chat_status = "reconectando"
         await app.tick()
