@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .i18n import LANGUAGES, Message, notice, notice_many
+from .i18n import LANGUAGES, Message, notice, notice_many, render
 from .teams import QUEUE, SorterError, TeamSorter
 from .config import Config
 from .speech import SpeechSession
@@ -330,8 +330,12 @@ class App:
   testvoice <team>          the team's goblin says a fixed phrase with the team's voice
   state                     show the state"""
 
-    async def command(self, line: str) -> Message:
-        """Run one operator command. The answer is a Message (a key plus values) the panel puts in its language."""
+    async def command(self, line: str, language: str | None = None) -> Message:
+        """Run one operator command. The answer is a Message (a key plus values) the panel puts in its language.
+
+        `language` is the one the panel is showing; it picks what the goblins *say* in a test (the stored
+        choice, or English, when the caller doesn't say)."""
+        lang = language if language in LANGUAGES else (self.language or "en")
         parts = line.strip().split()
         if not parts:
             return Message("msg.text", {"text": ""})
@@ -346,15 +350,17 @@ class App:
                 if len(args) < 2:
                     raise SorterError("err.usage", usage="test <team> <text>")
                 team = None if args[0] in (QUEUE, "-", "none") else args[0].lower()
-                ok = await self.say("teste", " ".join(args[1:]), team=team)
+                ok = await self.say(render("test.label", None, lang), " ".join(args[1:]), team=team)
                 return Message("msg.test_sent" if ok else "msg.test_ignored")
             if cmd == "testvoice":
                 # fixed phrase through the whole pipeline: TTS engine -> the team's voice profile -> its overlay
                 team = args[0].lower() if args else ""
                 if team not in s.teams:
                     raise SorterError("err.usage", usage=f"testvoice <team> ({', '.join(s.teams)})")
-                phrase = self.tts_cfg.get("test_phrase", "Fala chat! Aqui é o goblin do time {team}.").replace("{team}", team)
-                ok = await self.say(f"teste {team}", phrase, team=team)
+                name = render(f"team.{team}", None, lang)
+                phrase = self.tts_cfg.get("test_phrase")  # set in config.toml: said as written
+                phrase = phrase.replace("{team}", team) if phrase else render("testvoice.phrase", {"team": name}, lang)
+                ok = await self.say(f"{render('test.label', None, lang)} {name}", phrase, team=team)
                 return Message("msg.testvoice", {"team": team}) if ok else Message("msg.testvoice_full")
             if cmd == "skip":
                 return await self.skip()

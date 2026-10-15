@@ -299,5 +299,7 @@
   "tts.external_restart": "o servidor TTS foi iniciado fora do app; reinicie-o por lá",
   "tts.external_stop": "o servidor TTS foi iniciado fora do app; desligue-o por lá",
   "tts.manual_setup": "este servidor de voz é configurado manualmente (tts_server/setup.ps1)",
+  "test.label": "teste",
+  "testvoice.phrase": "Fala chat! Aqui é o goblin do time {team}.",
   "overlay.unlock": "clique para liberar o áudio"
 }

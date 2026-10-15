@@ -118,7 +118,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
             body = await request.json()
         except ValueError:
             raise fail(web.HTTPBadRequest, "http.bad_json")
-        reply = await app.command(str(body.get("command", "")))
+        reply = await app.command(str(body.get("command", "")), body.get("language"))
         return web.json_response({**reply.payload(), "state": app.state()})
 
     async def ws_handler(request):

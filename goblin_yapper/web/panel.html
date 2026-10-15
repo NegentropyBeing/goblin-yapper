@@ -371,7 +371,7 @@ function toast(text, err = false) {
 
 async function cmd(command, { quiet = false } = {}) {
   try {
-    const r = await fetch("/api/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command }) });
+    const r = await fetch("/api/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, language: i18n.lang }) });
     const data = await r.json();
     const err = !data.ok;
     if (err || !quiet) toast(i18n.fromServer(data).split("\n")[0], err);

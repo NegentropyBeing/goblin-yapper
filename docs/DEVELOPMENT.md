@@ -109,7 +109,7 @@ commands. `<time>` (team) is `azul`, `verde`, `roxo` or `amarelo`.
 | `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |
 | `engine <server\|sapi\|dummy>` | Switch the TTS engine |
 | `test <time> <texto>` | Make that team's goblin say a test line |
-| `testvoice <time>` | The team's goblin says the fixed phrase (`[tts] test_phrase`) in the team's voice (**Testar voz** button) |
+| `testvoice <time>` | The team's goblin says a fixed phrase in the team's voice (**Test voice** button): `[tts] test_phrase` if set, otherwise one in the interface language |
 | `language <en\|pt-BR>` | The panel's language (saved in `settings.json`, as `ui.language`) |
 | `state` | Print queue, teams and who has the voice |
 

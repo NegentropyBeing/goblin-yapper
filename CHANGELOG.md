@@ -10,6 +10,8 @@ values, so a client can translate them. Logs and the console are in English.
 - The chat status in `state.chat.status` is now `off | connecting | connected | reconnecting` (it was Portuguese).
 - Documents come in pairs, English by default and `.pt-BR` for Portuguese: `README`, `docs/DEVELOPMENT` and
 `docs/TESTE` (the test guide now exists in English).
+- **Testar voz** / **Test voice** and the test box speak in the interface language (a `[tts] test_phrase` in your
+`config.toml` still wins; remove it to follow the language). `POST /api/command` accepts an optional `language`.
 - The Windows installer is still Portuguese only.
 
 ## v0.6.1

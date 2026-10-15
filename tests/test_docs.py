@@ -37,8 +37,9 @@ def test_portuguese_documents_link_to_portuguese_documents():
 def test_english_documents_name_the_interface_in_english():
     catalog = {lang: json.loads((ROOT / "goblin_yapper" / "web" / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
                for lang in ("en", "pt-BR")}
-    labels = {catalog["pt-BR"][k] for k in catalog["en"]
-              if k.split(".")[0] in ("btn", "queue") and catalog["pt-BR"][k] != catalog["en"][k] and len(catalog["pt-BR"][k]) > 4}
+    labels = {catalog["pt-BR"][k].lstrip("⏭⏹🎤🔊 ") for k in catalog["en"]  # the icon in front of a label is not part of its name
+              if k.split(".")[0] in ("btn", "queue") and catalog["pt-BR"][k] != catalog["en"][k]}
+    labels = {label for label in labels if len(label) > 4}
     assert labels, "no button labels to check"
     for name, folder in PAIRS:
         text = doc(name, folder, "en").read_text(encoding="utf-8") if doc(name, folder, "en").exists() else ""

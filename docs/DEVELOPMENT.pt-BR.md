@@ -109,7 +109,7 @@ comandos. `<time>` é `azul`, `verde`, `roxo` ou `amarelo`.
 | `teamvoice <time\|default> <perfil\|none>` | Perfil de voz com que um time fala (aba Voz) |
 | `engine <server\|sapi\|dummy>` | Troca a engine de TTS |
 | `test <time> <texto>` | Faz o goblin daquele time dizer uma frase de teste |
-| `testvoice <time>` | O goblin do time diz a frase fixa (`[tts] test_phrase`) com a voz do time (botão **Testar voz**) |
+| `testvoice <time>` | O goblin do time diz uma frase fixa com a voz do time (botão **Testar voz**): a `[tts] test_phrase`, se existir, senão uma no idioma da interface |
 | `language <en\|pt-BR>` | Idioma do painel (fica salvo em `settings.json`, em `ui.language`) |
 | `state` | Mostra a fila, os times e quem está com a voz |
 

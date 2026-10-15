@@ -299,5 +299,7 @@
   "tts.external_restart": "the TTS server was started outside the app; restart it there",
   "tts.external_stop": "the TTS server was started outside the app; turn it off there",
   "tts.manual_setup": "this voice server is set up by hand (tts_server/setup.ps1)",
+  "test.label": "test",
+  "testvoice.phrase": "Hey chat! This is the {team} team's goblin.",
   "overlay.unlock": "click to unlock the audio"
 }

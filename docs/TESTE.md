@@ -187,7 +187,7 @@ Go back to the **Goblin** tab. You can test everything without Twitch, adding na
 
 **Voice**
 
-6. On a team, click **🔊 Test voice**. → You hear "Fala chat! Aqui é o goblin do time…" and that team's goblin
+6. On a team, click **🔊 Test voice**. → You hear "Hey chat! This is the … team's goblin." and that team's goblin
    moves while it talks. The other team's goblin stays still.
 7. Click **🎤 Draw voice** on the Blue team. → A card with the drawn name appears at the top, and the name is
    highlighted in the column.

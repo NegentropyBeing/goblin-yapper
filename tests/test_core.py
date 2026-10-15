@@ -714,3 +714,24 @@ def test_a_reply_renders_in_english_for_the_console_and_the_api():
     assert str(Message("err.unknown_team", {"team": "laranja"}, ok=False)) == "error: unknown team: laranja"
     assert str(Message("msg.tint", {"team": "azul", "color": "#fff", "strength": "0.70"})) == "azul tint: #fff strength 0.70"
     assert str(Message("no.such.key")) == "no.such.key"
+
+
+def test_test_speech_follows_the_interface_language_the_panel_sends():
+    async def run():
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
+        await app.command("testvoice azul", language="pt-BR")
+        pt = app.speech.queue.get_nowait()
+        assert (pt.text, pt.display) == ("Fala chat! Aqui é o goblin do time azul.", "teste azul")
+        await app.command("testvoice azul", language="en")
+        en = app.speech.queue.get_nowait()
+        assert (en.text, en.display) == ("Hey chat! This is the blue team's goblin.", "test blue")
+        await app.command("language pt-BR")  # without a language from the panel, the stored choice decides
+        await app.command("testvoice verde")
+        assert app.speech.queue.get_nowait().display == "teste verde"
+        await app.command("test azul oi", language="en")
+        assert app.speech.queue.get_nowait().display == "test"
+        configured = App({"teams": {"count": 2}, "tts": {"test_phrase": "Oi, time {team}!"}}, TTS({"engine": "dummy"}))
+        await configured.command("testvoice azul", language="en")
+        assert configured.speech.queue.get_nowait().text == "Oi, time azul!"  # a phrase set in config.toml wins
+
+    asyncio.run(run())
