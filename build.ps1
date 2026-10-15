@@ -1,6 +1,6 @@
 # Builds the Windows installer:
 #   1. freezes the Python backend into a single exe (PyInstaller) -> app/src-tauri/binaries
-#   2. builds the Tauri app and bundles everything into an .msi
+#   2. builds the Tauri app and bundles everything into one .msi per language (en-US, pt-BR)
 # Output: app/src-tauri/target/release/bundle/msi/*.msi
 # Native tools (pip, cargo) write progress to stderr; failures are caught via exit codes in Check.
 $ErrorActionPreference = "Continue"
@@ -31,7 +31,7 @@ $tts = Join-Path $root "tts_server"  # only its code is bundled; the voice runti
     (Join-Path $root "run_server.py")
 Check "PyInstaller"
 
-Write-Host "==> app (Tauri + MSI)" -ForegroundColor Cyan
+Write-Host "==> app (Tauri + one MSI per language)" -ForegroundColor Cyan
 Push-Location (Join-Path $root "app")
 try {
     npm install --no-fund --no-audit; Check "npm install"

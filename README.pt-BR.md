@@ -19,9 +19,11 @@ inglês: escolha em **Idioma**, no canto superior direito do painel (até você 
 
 ## Download e instalação
 
-1. Baixe o instalador `.msi` da [página de releases](https://github.com/NegentropyBeing/goblin-yapper/releases/latest).
+1. Baixe o instalador `.msi` no seu idioma na [página de releases](https://github.com/NegentropyBeing/goblin-yapper/releases/latest):
+   `…_x64_pt-BR.msi` (português) ou `…_x64_en-US.msi` (inglês). Os dois instalam o mesmo app; o arquivo só define o
+   idioma do próprio instalador. O idioma do app é escolhido à parte, no painel.
 2. Abra o arquivo. O instalador não é assinado, então o Windows SmartScreen pode avisar:
-   clique em **Mais informações → Executar assim mesmo**. O instalador, por enquanto, só existe em português.
+   clique em **Mais informações → Executar assim mesmo**.
 
 Requisitos:
 - Windows 10 ou 11 (64 bits).

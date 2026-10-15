@@ -52,10 +52,11 @@ cd app; npx tauri dev; cd ..                          # ou: compila e abre em um
 Necessário depois de mudar o ícone, a tela de carregamento (`app/src/index.html`) ou o `main.rs`.
 Mudanças no painel e no overlay só exigem reiniciar o backend.
 
-**Gerar o instalador (.msi)**
+**Gerar os instaladores (.msi, um por idioma)**
 
 ```powershell
 .\build.ps1
+# -> app\src-tauri\target\release\bundle\msi\Goblin Yapper_<versão>_x64_en-US.msi
 # -> app\src-tauri\target\release\bundle\msi\Goblin Yapper_<versão>_x64_pt-BR.msi
 ```
 

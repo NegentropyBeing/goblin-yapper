@@ -733,5 +733,10 @@ def test_test_speech_follows_the_interface_language_the_panel_sends():
         configured = App({"teams": {"count": 2}, "tts": {"test_phrase": "Oi, time {team}!"}}, TTS({"engine": "dummy"}))
         await configured.command("testvoice azul", language="en")
         assert configured.speech.queue.get_nowait().text == "Oi, time azul!"  # a phrase set in config.toml wins
+        # the old default phrase, copied into every config.toml made before the languages existed, is not a choice
+        old = App({"teams": {"count": 2}, "tts": {"test_phrase": "Fala chat! Aqui é o goblin do time {team}."}},
+                  TTS({"engine": "dummy"}))
+        await old.command("testvoice azul", language="en")
+        assert old.speech.queue.get_nowait().text == "Hey chat! This is the blue team's goblin."
 
     asyncio.run(run())

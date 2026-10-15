@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Goblin Yapper",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "identifier": "com.goblinyapper.desktop",
   "build": {
     "frontendDist": "../src"
@@ -37,7 +37,7 @@
     "externalBin": ["binaries/goblin-yapper-server"],
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },
-      "wix": { "language": "pt-BR" }
+      "wix": { "language": ["en-US", "pt-BR"] }
     }
   }
 }

@@ -52,10 +52,11 @@ cd app; npx tauri dev; cd ..                          # or: compile and launch i
 Needed after changing the icon, the loading screen (`app/src/index.html`) or `main.rs`.
 Panel and overlay changes only need the backend restarted.
 
-**Build the installer (.msi)**
+**Build the installers (.msi, one per language)**
 
 ```powershell
 .\build.ps1
+# -> app\src-tauri\target\release\bundle\msi\Goblin Yapper_<version>_x64_en-US.msi
 # -> app\src-tauri\target\release\bundle\msi\Goblin Yapper_<version>_x64_pt-BR.msi
 ```
 
