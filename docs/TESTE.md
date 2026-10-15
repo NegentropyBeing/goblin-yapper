@@ -1,255 +1,260 @@
-# Guia de teste do Goblin Yapper (do zero)
+# Goblin Yapper test guide (from scratch)
 
-Este guia leva você de um computador sem nada instalado até o Goblin Yapper funcionando, um passo de cada
-vez. Não precisa saber programar. Siga os passos na ordem e confira o **"Você deve ver"** de cada um antes de
-ir para o próximo. Se algo sair diferente, vá para [Problemas comuns](#problemas-comuns).
+> **Português:** este guia em português: [TESTE.pt-BR.md](TESTE.pt-BR.md).
 
-Tempo: cerca de 15 minutos, mais o download da voz clonada se você quiser testá-la (opcional).
+This guide takes you from a computer with nothing installed to Goblin Yapper running, one step at a time. You
+don't need to know how to program. Follow the steps in order and check the **"You should see"** of each one before
+going on to the next. If something looks different, go to [Common problems](#common-problems).
 
-## O que você precisa
+Time: about 15 minutes, plus the download of the cloned voice if you want to try it (optional).
 
-- Um computador com **Windows 10 ou 11** (64 bits) e internet.
-- Cerca de **1 GB livre** em disco para o básico.
-- Só para a voz clonada (opcional): cerca de **13 GB livres** e, de preferência, uma placa de vídeo **NVIDIA**.
-  Sem placa NVIDIA a voz clonada funciona, mas é bem lenta. Dá para testar todo o resto com a voz do Windows.
+## What you need
 
-Você **não** precisa de conta na Twitch, nem do OBS, para fazer o teste básico.
+- A computer with **Windows 10 or 11** (64-bit) and internet.
+- About **1 GB of free disk space** for the basics.
+- Only for the cloned voice (optional): about **13 GB free** and, preferably, an **NVIDIA** graphics card.
+  Without an NVIDIA card the cloned voice works, but it is quite slow. You can test everything else with the
+  Windows voice.
+
+You do **not** need a Twitch account, or OBS, for the basic test.
 
 ---
 
-## Passo 1: instalar o Python 3.13
+## Step 1: install Python 3.13
 
-O Goblin Yapper é feito em Python, então o Python precisa estar instalado.
+Goblin Yapper is written in Python, so Python must be installed.
 
-1. Abra <https://www.python.org/downloads/windows/> no navegador.
-2. Na lista, procure **Python 3.13** e clique em **Windows installer (64-bit)** para baixar.
-3. Abra o arquivo baixado.
-4. **Importante:** na primeira tela, marque a caixinha **"Add python.exe to PATH"**, lá embaixo.
-5. Clique em **Install Now** e espere terminar. Clique em **Close**.
+1. Open <https://www.python.org/downloads/windows/> in your browser.
+2. In the list, look for **Python 3.13** and click **Windows installer (64-bit)** to download it.
+3. Open the downloaded file.
+4. **Important:** on the first screen, tick the box **"Add python.exe to PATH"**, at the bottom.
+5. Click **Install Now** and wait for it to finish. Click **Close**.
 
-Agora confira se deu certo:
+Now check that it worked:
 
-1. Aperte a tecla **Windows**, digite `powershell` e aperte **Enter**. Abre uma janela azul ou preta.
-2. Digite (ou copie e cole) o comando abaixo e aperte **Enter**:
+1. Press the **Windows** key, type `powershell` and press **Enter**. A blue or black window opens.
+2. Type (or copy and paste) the command below and press **Enter**:
 
    ```powershell
    py -3.13 --version
    ```
 
-**Você deve ver:** `Python 3.13.` seguido de um número, por exemplo `Python 3.13.7`.
+**You should see:** `Python 3.13.` followed by a number, for example `Python 3.13.7`.
 
-Pode fechar essa janela.
+You can close that window.
 
 ---
 
-## Passo 2: baixar o projeto
+## Step 2: download the project
 
-1. Abra este link no navegador. O download começa sozinho:
+1. Open this link in your browser. The download starts by itself:
    <https://github.com/NegentropyBeing/goblin-yapper/archive/refs/heads/main.zip>
-2. Abra a pasta **Downloads**. Clique com o botão direito no arquivo `goblin-yapper-main.zip` e escolha
-   **Extrair tudo...**
-3. Em "Os arquivos serão extraídos para esta pasta", apague o que estiver escrito e digite `C:\` . Clique em
-   **Extrair**.
+2. Open the **Downloads** folder. Right-click the file `goblin-yapper-main.zip` and choose **Extract All...**
+3. Under "Files will be extracted to this folder", delete what is written there and type `C:\` . Click
+   **Extract**.
 
-**Você deve ver:** uma pasta `C:\goblin-yapper-main` com arquivos como `README.md` e `requirements.txt` e
-pastas como `goblin_yapper` e `docs`.
+**You should see:** a folder `C:\goblin-yapper-main` with files like `README.md` and `requirements.txt` and
+folders like `goblin_yapper` and `docs`.
 
-Se o Windows não deixar extrair em `C:\`, extraia na pasta **Documentos**. Nesse caso, onde este guia diz
-`C:\goblin-yapper-main`, use a pasta `goblin-yapper-main` que ficou dentro de Documentos.
-
----
-
-## Passo 3: abrir o PowerShell dentro da pasta do projeto
-
-1. Abra a pasta `C:\goblin-yapper-main` no Explorador de Arquivos.
-2. Clique na **barra de endereço** no topo da janela (onde aparece o caminho da pasta). O texto fica
-   selecionado.
-3. Digite `powershell` e aperte **Enter**.
-
-**Você deve ver:** uma janela do PowerShell cuja última linha termina com `C:\goblin-yapper-main>`.
-
-Todos os comandos dos próximos passos são digitados **nessa janela**. Para colar um comando copiado, clique
-com o botão direito dentro da janela.
+If Windows won't let you extract to `C:\`, extract to the **Documents** folder. In that case, wherever this guide
+says `C:\goblin-yapper-main`, use the `goblin-yapper-main` folder that ended up inside Documents.
 
 ---
 
-## Passo 4: instalar as dependências
+## Step 3: open PowerShell inside the project folder
 
-São dois comandos. Rode um de cada vez, esperando o primeiro terminar (a linha `C:\goblin-yapper-main>`
-volta a aparecer) antes de rodar o segundo.
+1. Open the folder `C:\goblin-yapper-main` in File Explorer.
+2. Click the **address bar** at the top of the window (where the folder path is). The text becomes selected.
+3. Type `powershell` and press **Enter**.
 
-**Comando 1**, cria um ambiente isolado só para o projeto (uns 20 segundos, não mostra nada na tela):
+**You should see:** a PowerShell window whose last line ends with `C:\goblin-yapper-main>`.
+
+All the commands in the next steps are typed **in that window**. To paste a copied command, right-click inside the
+window.
+
+---
+
+## Step 4: install the dependencies
+
+There are two commands. Run one at a time, waiting for the first to finish (the line `C:\goblin-yapper-main>`
+shows up again) before running the second.
+
+**Command 1** creates an isolated environment just for the project (about 20 seconds, it shows nothing on screen):
 
 ```powershell
 py -3.13 -m venv .venv
 ```
 
-**Comando 2**, baixa e instala as dependências (até 1 minuto):
+**Command 2** downloads and installs the dependencies (up to 1 minute):
 
 ```powershell
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-**Você deve ver:** várias linhas de download e, perto do fim, uma linha que começa com
-`Successfully installed`. Um aviso `[notice] A new release of pip is available` é normal, pode ignorar.
+**You should see:** several download lines and, near the end, a line that starts with `Successfully installed`.
+A `[notice] A new release of pip is available` warning is normal, you can ignore it.
 
-Não precisa "ativar" o ambiente nem instalar mais nada. Isso só é feito uma vez.
+You don't need to "activate" the environment or install anything else. This is done only once.
 
 ---
 
-## Passo 5: iniciar o Goblin Yapper
+## Step 5: start Goblin Yapper
 
-Na mesma janela, rode:
+In the same window, run:
 
 ```powershell
 .venv\Scripts\python -m goblin_yapper
 ```
 
-**Você deve ver**, em alguns segundos, uma lista de comandos e linhas parecidas com estas:
+**You should see**, within a few seconds, a list of commands and lines like these:
 
 ```
-config criado em C:\goblin-yapper-main\config.toml
-painel: http://127.0.0.1:8765/panel  |  overlay: http://127.0.0.1:8765/overlay
-sem canal da Twitch configurado (use o painel ou: channel <canal>)
+config created at C:\goblin-yapper-main\config.toml
+panel: http://127.0.0.1:8765/panel  |  overlay: http://127.0.0.1:8765/overlay
+no Twitch channel set (use the panel or: channel <channel>)
 >
 ```
 
-O aviso sobre o canal da Twitch e um aviso `servidor de voz não instalado` são normais nesta etapa.
+The warning about the Twitch channel and a `voice server not installed` warning are normal at this stage.
 
-**Deixe essa janela aberta.** Ela é o programa rodando. Se você fechar a janela, o Goblin Yapper para.
+**Leave that window open.** It is the program running. If you close the window, Goblin Yapper stops.
 
 ---
 
-## Passo 6: abrir o painel
+## Step 6: open the panel
 
-Abra o navegador (Chrome ou Edge) e entre neste endereço:
+Open your browser (Chrome or Edge) and go to this address:
 
 <http://127.0.0.1:8765/panel>
 
-**Você deve ver:** uma tela escura com o título **Goblin Yapper**, as abas **Goblin** e **Voz**, uma coluna
-**Fila** e colunas coloridas dos times, cada uma com um goblin.
+**You should see:** a dark screen with the title **Goblin Yapper**, the **Goblin** and **Voice** tabs, a **Queue**
+column and colored team columns, each with a goblin.
 
-Esse endereço só funciona no seu próprio computador e só enquanto a janela do Passo 5 estiver aberta.
+The panel opens in your Windows language. If it appears in a language you don't want, change it with **Language**
+at the top right.
 
----
-
-## Passo 7: escolher a voz
-
-Clique na aba **Voz**. Escolha **uma** das opções.
-
-### Opção A: voz do Windows (rápida, recomendada para começar)
-
-1. No canto superior direito, em **motor**, escolha **Windows (SAPI)**.
-
-Pronto. O aviso amarelo sobre o servidor de voz pode ser ignorado nesta opção.
-
-### Opção B: voz clonada (OmniVoice)
-
-Só faça se tiver os ~13 GB livres. É demorado na primeira vez.
-
-1. Em **motor**, deixe **OmniVoice (servidor)**.
-2. No aviso amarelo, clique em **Instalar servidor de voz**.
-3. Espere. A tela mostra o andamento em 5 etapas. São cerca de 3,5 GB de download, de 5 a 20 minutos
-   conforme a internet. Não feche nada.
-4. Quando terminar, o texto no topo muda para **carregando modelo de voz…** e baixa mais ~3 GB. Espere até
-   aparecer **OmniVoice · pronto** com uma bolinha verde.
-
-Para clonar uma voz, você precisa de um arquivo `.wav` com 3 a 20 segundos de fala limpa. **Só use a voz de
-alguém com a permissão da pessoa.**
-
-1. Arraste o `.wav` para a área **Arraste um .wav aqui**.
-2. Espere as etapas **Preparar áudio** e **Transcrever** ficarem com um ✓ verde. Na primeira vez a
-   transcrição baixa mais ~1,6 GB e pode levar alguns minutos; nas seguintes leva segundos.
-3. Confira se o texto em **Transcrição** é exatamente o que é dito no áudio. Corrija se precisar.
-4. Dê um nome e clique em **Criar perfil**.
-5. Em **Voz de cada time**, escolha esse perfil para os times.
-6. Em **Testar fala**, clique em **Falar** para ouvir.
+This address only works on your own computer and only while the window from Step 5 is open.
 
 ---
 
-## Passo 8: roteiro de teste
+## Step 7: choose the voice
 
-Volte para a aba **Goblin**. Dá para testar tudo sem a Twitch, adicionando nomes à mão.
+Click the **Voice** tab. Choose **one** of the options.
 
-**Times**
+### Option A: Windows voice (fast, recommended to start)
 
-1. No campo **adicionar nick**, embaixo da coluna **Fila**, digite `ana` e aperte **Enter**. Repita com
-   `bia`, `caio` e `duda`. → Os quatro nomes aparecem na Fila.
-2. Em **times**, clique em **2**. → Ficam só as colunas Azul e Verde.
-3. Clique em **Sortear**. → Dois nomes em cada time, a Fila fica vazia.
-4. Arraste um nome de um time para o outro. → O nome muda de coluna.
-5. Clique em **Re-sortear**, depois em **Devolver à fila**. → Os times mudam; depois todos voltam para a Fila.
-   Clique em **Sortear** de novo para continuar.
+1. At the top right, under **engine**, choose **Windows (SAPI)**.
 
-**Voz**
+That's it. The yellow warning about the voice server can be ignored with this option.
 
-6. Em um time, clique em **🔊 Testar voz**. → Você ouve "Fala chat! Aqui é o goblin do time…" e o goblin
-   daquele time se mexe enquanto fala. O goblin do outro time fica parado.
-7. Clique em **🎤 Sortear voz** no time Azul. → Aparece um cartão com o nome sorteado no topo, e o nome fica
-   destacado na coluna.
-8. Clique em **⏭ Próximo**. → A voz passa para a outra pessoa do mesmo time.
-9. Marque **vários times ao mesmo tempo** e clique em **🎤 Sortear voz** no time Verde. → Dois cartões no
-   topo, um de cada time.
-10. Clique em **⏹ Parar** no time Azul. → Some só o cartão do Azul. Depois clique em **Parar voz**, no topo.
-    → Some o outro cartão e aparece "ninguém com a voz".
+### Option B: cloned voice (OmniVoice)
 
-**Aparência**
+Only do this if you have the ~13 GB free. It takes a while the first time.
 
-11. Em um time, mude a cor em **tinta** e arraste a barra ao lado. → O goblin daquele time muda de cor na hora.
-12. Clique em **Overlay do OBS e imagens do goblin**, lá embaixo, e clique em **copiar** ao lado de
-    **Time azul**. Abra uma **nova janela** do navegador (Ctrl+N), cole o endereço e aperte **Enter**. Clique
-    uma vez dentro dessa janela (isso libera o som) e deixe-a visível ao lado do painel. No painel, clique em
-    **🔊 Testar voz** no Azul. → O goblin da janela nova se mexe e o som sai dela, e no painel aparece uma
-    bolinha verde ao lado da URL **Time azul**.
+1. Under **engine**, leave **OmniVoice (server)**.
+2. In the yellow warning, click **Install voice server**.
+3. Wait. The screen shows the progress in 5 steps. It is about 3.5 GB of download, 5 to 20 minutes depending on
+   your internet. Don't close anything.
+4. When it finishes, the text at the top changes to **loading the voice model…** and downloads ~3 GB more. Wait
+   until **OmniVoice · ready** shows up with a green dot.
 
-**Com a Twitch (opcional)**
+To clone a voice, you need a `.wav` file with 3 to 20 seconds of clean speech. **Only use someone's voice with
+their permission.**
 
-13. No campo **canal da twitch**, digite o nome de um canal e clique em **Conectar**. → Aparece
-    `#canal · conectado` com uma bolinha verde.
-14. Clique em **Abrir fila** e, no chat desse canal, digite `!joinsort`. → Seu nick aparece na Fila.
-15. Passe o mouse sobre o seu nick e clique no 🎤 que aparece ao lado dele. Depois escreva qualquer coisa no
-    chat. → A mensagem é lida em voz alta.
+1. Drag the `.wav` to the **Drop a .wav here** area.
+2. Wait for the **Prepare audio** and **Transcribe** steps to get a green ✓. The first time, the transcription
+   downloads ~1.6 GB more and can take a few minutes; the next times it takes seconds.
+3. Check that the text under **Transcript** is exactly what is said in the audio. Fix it if you need to.
+4. Give it a name and click **Create profile**.
+5. Under **Each team's voice**, pick that profile for the teams.
+6. Under **Test speech**, click **Speak** to listen.
 
 ---
 
-## Fechar e abrir de novo
+## Step 8: test script
 
-- **Para fechar:** na janela do PowerShell, digite `quit` e aperte **Enter** (ou simplesmente feche a janela).
-- **Para abrir de novo:** repita só os passos **3**, **5** e **6**. Os passos 1, 2 e 4 são feitos uma única vez.
+Go back to the **Goblin** tab. You can test everything without Twitch, adding names by hand.
 
-Suas configurações ficam guardadas na pasta do projeto e voltam quando você abre de novo.
+**Teams**
+
+1. In the **add a nick** field, at the bottom of the **Queue** column, type `ana` and press **Enter**. Repeat
+   with `bia`, `caio` and `duda`. → The four names show up in the Queue.
+2. Next to **teams**, click **2**. → Only the Blue and Green columns are left.
+3. Click **Sort**. → Two names in each team, the Queue is empty.
+4. Drag a name from one team to the other. → The name changes column.
+5. Click **Re-sort**, then **Return to queue**. → The teams change; then everyone goes back to the Queue.
+   Click **Sort** again to go on.
+
+**Voice**
+
+6. On a team, click **🔊 Test voice**. → You hear "Hey chat! This is the … team's goblin." and that team's goblin
+   moves while it talks. The other team's goblin stays still.
+7. Click **🎤 Draw voice** on the Blue team. → A card with the drawn name appears at the top, and the name is
+   highlighted in the column.
+8. Click **⏭ Next**. → The voice goes to the other person on the same team.
+9. Tick **several teams at the same time** and click **🎤 Draw voice** on the Green team. → Two cards at the
+   top, one from each team.
+10. Click **⏹ Stop** on the Blue team. → Only the Blue card goes away. Then click **Stop voice**, at the top.
+    → The other card goes away and "nobody has the voice" shows up.
+
+**Look**
+
+11. On a team, change the color under **tint** and drag the bar next to it. → That team's goblin changes color
+    right away.
+12. Click **OBS overlay and goblin images**, at the bottom, and click **copy** next to **Team blue**. Open a
+    **new window** of the browser (Ctrl+N), paste the address and press **Enter**. Click once inside that window
+    (this unlocks the sound) and leave it visible next to the panel. In the panel, click **🔊 Test voice** on
+    Blue. → The goblin in the new window moves and the sound comes from it, and a green dot shows up next to the
+    **Team blue** URL in the panel.
+
+**With Twitch (optional)**
+
+13. In the **twitch channel** field, type a channel name and click **Connect**. → `#channel · connected` shows
+    up with a green dot.
+14. Click **Open queue** and, in that channel's chat, type `!joinsort`. → Your nick shows up in the Queue.
+15. Hover over your nick and click the 🎤 that appears next to it. Then write anything in the chat. → The
+    message is read aloud.
 
 ---
 
-## Problemas comuns
+## Closing and opening again
 
-| O que aparece | O que fazer |
+- **To close:** in the PowerShell window, type `quit` and press **Enter** (or just close the window).
+- **To open again:** repeat only steps **3**, **5** and **6**. Steps 1, 2 and 4 are done only once.
+
+Your settings are kept in the project folder and come back when you open it again.
+
+---
+
+## Common problems
+
+| What shows up | What to do |
 |---|---|
-| `py : O termo 'py' não é reconhecido` | O Python não foi instalado, ou a janela do PowerShell é antiga. Feche a janela, refaça o Passo 1 (marcando **Add python.exe to PATH**) e abra uma janela nova. |
-| `Python 3.13 not found` ou `No suitable Python runtime found` | Há outra versão do Python instalada, mas não a 3.13. Instale a 3.13 pelo Passo 1; as duas convivem sem problema. |
-| `Não é possível localizar o caminho` ou `requirements.txt` não encontrado | O PowerShell não está na pasta do projeto. Feche-o e refaça o Passo 3. A última linha tem que terminar com `goblin-yapper-main>`. |
-| `error while attempting to bind on address ('127.0.0.1', 8765)` | O Goblin Yapper já está aberto em outra janela. Feche a outra janela (ou o app instalado) e rode o Passo 5 de novo. |
-| O navegador diz **"Não é possível acessar esse site"** | A janela do Passo 5 foi fechada ou deu erro. Olhe a janela do PowerShell e rode o Passo 5 de novo. |
-| `a execução de scripts foi desabilitada neste sistema` | Você tentou "ativar" o ambiente. Não precisa: use os comandos exatamente como estão neste guia. |
-| Erro vermelho no Passo 4, comando 2 | Quase sempre é a internet. Confira a conexão e rode o comando de novo. |
-| Não sai som | Confira o volume do computador. Na aba **Voz**, veja se o **motor** é **Windows (SAPI)** ou se o topo mostra **OmniVoice · pronto**. Se abriu o overlay em uma aba, clique uma vez dentro dela. |
-| A instalação da voz falhou | Clique em **Tentar de novo**. Confira o espaço em disco (~13 GB) e a internet. |
-| A tela mostra **"conectando ao servidor…"** | A janela do Passo 5 foi fechada. Rode o Passo 5 de novo; a página volta sozinha. |
+| `py : The term 'py' is not recognized` | Python was not installed, or the PowerShell window is old. Close the window, redo Step 1 (ticking **Add python.exe to PATH**) and open a new window. |
+| `Python 3.13 not found` or `No suitable Python runtime found` | Another Python version is installed, but not 3.13. Install 3.13 from Step 1; they live together without trouble. |
+| `Cannot find path` or `requirements.txt` not found | PowerShell is not in the project folder. Close it and redo Step 3. The last line must end with `goblin-yapper-main>`. |
+| `error while attempting to bind on address ('127.0.0.1', 8765)` | Goblin Yapper is already open in another window. Close the other window (or the installed app) and run Step 5 again. |
+| The browser says **"This site can't be reached"** | The window from Step 5 was closed or hit an error. Look at the PowerShell window and run Step 5 again. |
+| `running scripts is disabled on this system` | You tried to "activate" the environment. You don't need to: use the commands exactly as they are in this guide. |
+| Red error in Step 4, command 2 | Almost always the internet. Check your connection and run the command again. |
+| No sound | Check the computer's volume. In the **Voice** tab, see whether **engine** is **Windows (SAPI)** or the top shows **OmniVoice · ready**. If you opened the overlay in a tab, click once inside it. |
+| The voice installation failed | Click **Try again**. Check the disk space (~13 GB) and the internet. |
+| The screen shows **"connecting to the server…"** | The window from Step 5 was closed. Run Step 5 again; the page comes back by itself. |
 
-## Como avisar de um problema
+## How to report a problem
 
-Mande para quem pediu o teste:
+Send the person who asked for the test:
 
-1. O que você fez, passo a passo, e o que esperava que acontecesse.
-2. Um print da tela do painel e da janela do PowerShell.
-3. O arquivo `goblin-yapper.log`, que fica em `C:\goblin-yapper-main`. Se o problema for de voz clonada,
-   mande também `C:\goblin-yapper-main\tts\tts-server.log`.
+1. What you did, step by step, and what you expected to happen.
+2. A screenshot of the panel and of the PowerShell window.
+3. The file `goblin-yapper.log`, which is in `C:\goblin-yapper-main`. If the problem is with the cloned voice,
+   also send `C:\goblin-yapper-main\tts\tts-server.log`.
 
-## Para apagar tudo depois
+## To delete everything afterwards
 
-1. Feche o Goblin Yapper e apague a pasta `C:\goblin-yapper-main`.
-2. Se instalou a voz clonada: aperte **Windows + R**, digite `%LOCALAPPDATA%` e aperte **Enter**; apague a
-   pasta `GoblinYapper`. Para apagar também o modelo de voz, aperte **Windows + R**, digite
-   `%USERPROFILE%\.cache\huggingface` e apague a pasta `hub`. Atenção: essa pasta `hub` também guarda modelos
-   de outros programas de IA, se você tiver algum.
-3. O Python pode ser removido em **Configurações → Aplicativos**, se você não for usar para mais nada.
+1. Close Goblin Yapper and delete the folder `C:\goblin-yapper-main`.
+2. If you installed the cloned voice: press **Windows + R**, type `%LOCALAPPDATA%` and press **Enter**; delete
+   the `GoblinYapper` folder. To also delete the voice model, press **Windows + R**, type
+   `%USERPROFILE%\.cache\huggingface` and delete the `hub` folder. Careful: that `hub` folder also holds the
+   models of other AI programs, if you have any.
+3. Python can be removed in **Settings → Apps**, if you won't use it for anything else.

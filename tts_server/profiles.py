@@ -86,7 +86,7 @@ class ProfileStore:
     def path(self, pid: str) -> Path:
         d = self.root / pid
         if not re.fullmatch(r"[a-z0-9-]+", pid) or not (d / "profile.json").exists():
-            raise NotFound(f"perfil não encontrado: {pid}")
+            raise NotFound(f"profile not found: {pid}")
         return d
 
     def reference(self, pid: str) -> Path:
@@ -118,7 +118,7 @@ class ProfileStore:
         profile folder on any failure."""
         name, ref_text = name.strip(), ref_text.strip()
         if not name or not ref_text:
-            raise ProfileError("nome e transcrição são obrigatórios")
+            raise ProfileError("name and transcript are required")
         pid = f"{slugify(name)}-{secrets.token_hex(2)}"
         pdir = self.root / pid
         pdir.mkdir()

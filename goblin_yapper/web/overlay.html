@@ -48,7 +48,8 @@
   <div class="goblin hidden" id="goblin"></div>
   <div class="label hidden" id="label"></div>
 </div>
-<div id="unlock">clique para liberar o áudio</div>
+<div id="unlock" data-i18n="overlay.unlock"></div>
+<script src="/web/i18n.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const PIN_TEAM = params.get("team");
@@ -167,7 +168,7 @@ function connect() {
   ws.onopen = () => send({ type: "hello", role: PREVIEW ? "preview" : "overlay", team: PIN_TEAM, audio: PLAY_AUDIO });
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === "state") { state = msg; render(); }
+    if (msg.type === "state") { state = msg; applyLanguage(); render(); }
     else if (msg.type === "speak") onSpeak(msg);
     else if (msg.type === "idle" || msg.type === "stop") stopTalking(msg.id);
     else if (msg.type === "assets") loadAssets();
@@ -183,7 +184,16 @@ unlockEl.onclick = () => { unlockEl.style.display = "none"; };  // the click its
 function loadAssets() {
   return fetch("/api/assets").then(r => r.json()).then(a => { assets = a.teams; renderedKey = null; render(); });
 }
-fetch("/api/state").then(r => r.json()).then(s => { state = state || s; render(); }).catch(() => {});
+// Only the "click to unlock the audio" hint is text; it follows the panel's interface language.
+let shownLanguage = null;
+async function applyLanguage() {
+  const lang = i18n.resolveLanguage(state?.language);
+  if (lang === shownLanguage) return;
+  shownLanguage = lang;
+  await i18n.load(lang);
+  i18n.apply();
+}
+fetch("/api/state").then(r => r.json()).then(s => { state = state || s; applyLanguage(); render(); }).catch(() => {});
 loadAssets().finally(connect);
 </script>
 </body>

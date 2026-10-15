@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Bilingual interface (English / Portuguese).** Pick the language with **Language** at the top right of the panel;
+until you do, the panel follows the system language. The choice is stored in `settings.json` (`ui.language`) and
+there is a new `language <en|pt-BR>` command. The text of the panel and the overlay lives in `web/i18n/*.json`;
+`POST /api/command` now answers `{ok, key, params, output, state}` and notices and HTTP errors are a key plus
+values, so a client can translate them. Logs and the console are in English.
+- The chat status in `state.chat.status` is now `off | connecting | connected | reconnecting` (it was Portuguese).
+- Documents come in pairs, English by default and `.pt-BR` for Portuguese: `README`, `docs/DEVELOPMENT` and
+`docs/TESTE` (the test guide now exists in English).
+- **Testar voz** / **Test voice** and the test box speak in the interface language (a `[tts] test_phrase` in your
+`config.toml` still wins; remove it to follow the language). `POST /api/command` accepts an optional `language`.
+- The Windows installer is still Portuguese only.
+
 ## v0.6.1
 
 Windows installer: `Goblin Yapper_0.6.1_x64_pt-BR.msi`.

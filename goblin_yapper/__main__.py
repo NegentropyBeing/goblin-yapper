@@ -30,7 +30,7 @@ DEFAULT_CONFIG = Path(__file__).resolve().parent / "default_config.toml"
 
 
 async def console_loop(app: App) -> None:
-    print(App.HELP + "\n  quit                      sai\n")
+    print(App.HELP + "\n  quit                      exit\n")
     while True:
         try:
             line = await asyncio.to_thread(input, "> ")
@@ -39,8 +39,8 @@ async def console_loop(app: App) -> None:
             return
         if line.strip().lower() in ("quit", "exit"):
             raise SystemExit
-        if out := await app.command(line):
-            print(out)
+        if text := str(await app.command(line)):
+            print(text)
 
 
 async def watch_parent(pid: int) -> None:
@@ -60,7 +60,7 @@ async def watch_parent(pid: int) -> None:
                 return False
     while alive():
         await asyncio.sleep(2)
-    log.info("app principal encerrou; saindo")
+    log.info("the desktop app exited; quitting")
     os._exit(0)
 
 
@@ -68,7 +68,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     config_path = data_dir / "config.toml"
     if not config_path.exists():
         shutil.copyfile(DEFAULT_CONFIG, config_path)
-        log.info("config criado em %s", config_path)
+        log.info("config created at %s", config_path)
     cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
     tts = TTS(cfg.get("tts", {}), data_dir)
@@ -80,7 +80,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
     runner = web.AppRunner(make_web_app(app, data_dir / "assets"), access_log=None)
     await runner.setup()
     await web.TCPSite(runner, host, port).start()
-    log.info("painel: http://%s:%s/panel  |  overlay: http://%s:%s/overlay", host, port, host, port)
+    log.info("panel: http://%s:%s/panel  |  overlay: http://%s:%s/overlay", host, port, host, port)
     if args.open:
         webbrowser.open(f"http://{host}:{port}/panel")
 
@@ -94,7 +94,7 @@ async def main(args: argparse.Namespace, data_dir: Path) -> None:
         except SorterError as e:  # invalid channel in config/settings
             log.warning("%s", e)
     if not app.channel:
-        log.warning("sem canal da Twitch configurado (use o painel ou: channel <canal>)")
+        log.warning("no Twitch channel set (use the panel or: channel <channel>)")
     try:
         if not args.no_console:
             await console_loop(app)
@@ -118,14 +118,14 @@ def setup_logging(data_dir: Path, verbose: bool) -> None:
 
 def cli() -> None:
     p = argparse.ArgumentParser(prog="goblin_yapper")
-    p.add_argument("--data-dir", default=".", help="pasta de dados (config, assets, vozes, log)")
-    p.add_argument("--channel", help="canal da Twitch (sobrepõe o config)")
+    p.add_argument("--data-dir", default=".", help="data folder (config, assets, voices, log)")
+    p.add_argument("--channel", help="Twitch channel (overrides the config)")
     p.add_argument("--host")
     p.add_argument("--port", type=int)
-    p.add_argument("--no-chat", action="store_true", help="não conectar ao chat (testes)")
-    p.add_argument("--no-console", action="store_true", help="sem console interativo (modo app)")
-    p.add_argument("--open", action="store_true", help="abre o painel no navegador ao iniciar")
-    p.add_argument("--parent-pid", type=int, help="encerra quando este processo terminar (usado pelo app)")
+    p.add_argument("--no-chat", action="store_true", help="do not connect to the chat (tests)")
+    p.add_argument("--no-console", action="store_true", help="no interactive console (app mode)")
+    p.add_argument("--open", action="store_true", help="open the panel in the browser on start")
+    p.add_argument("--parent-pid", type=int, help="exit when this process ends (used by the app)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
 
@@ -138,7 +138,7 @@ def cli() -> None:
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:
-        log.exception("erro fatal")
+        log.exception("fatal error")
         raise
 
 

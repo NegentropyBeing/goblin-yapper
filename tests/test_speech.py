@@ -63,7 +63,7 @@ def test_a_failing_tts_reports_and_the_next_line_goes_on():
         worker = asyncio.create_task(s.run())
         synth.fail = "sem GPU"
         await s.say("Ana", "primeira", "ana")
-        await _until(lambda: any("sem GPU" in m.get("text", "") for m in stage.sent))
+        await _until(lambda: any(m.get("key") == "notice.tts_failed" and m["params"] == {"error": "sem GPU"} for m in stage.sent))
         synth.fail = None
         await s.say("Ana", "segunda", "ana")
         await _until(lambda: s.speaking is not None)
