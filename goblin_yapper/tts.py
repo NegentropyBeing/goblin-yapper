@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import io
+import json
 import logging
 import math
 import os
@@ -27,6 +28,8 @@ import wave
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+DEFAULT_SERVER_URL = "http://127.0.0.1:8766"
 
 
 def wav_duration(data: bytes) -> float:
@@ -125,11 +128,10 @@ class ServerEngine(Engine):
     reentrant = True  # the server queues the requests itself
 
     def synthesize(self, text: str, voice: dict) -> bytes:
-        import json
         import urllib.error
         import urllib.request
 
-        url = self.cfg.get("url", "http://127.0.0.1:8766").rstrip("/") + "/synthesize"
+        url = self.cfg.get("url", DEFAULT_SERVER_URL).rstrip("/") + "/synthesize"
         body = json.dumps({"text": text, "profile": voice.get("profile")}, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
         try:
@@ -169,23 +171,47 @@ class CustomEngine(Engine):
 ENGINES = {e.name: e for e in (DummyEngine, SapiEngine, ServerEngine, CustomEngine)}
 
 
-class TTS:
-    """Async wrapper: loads the engine once and serialises synthesis in a worker thread."""
+class Synthesizer:
+    """Turns a line and a team into WAV bytes. Hides which engine is active, how a team maps to a voice
+    profile, the lock that serialises synthesis, and (for the TTS server) the supervised process.
 
-    def __init__(self, tts_cfg: dict):
+    Interface: configure(cfg), load/start/close, synthesize(text, team), set_engine(name),
+    voice_for / voice_key(team), set_team_profile(team, profile), service (None without a data dir)."""
+
+    def __init__(self, tts_cfg: dict, data_dir: Path | None = None):
+        self.error: str | None = None
+        self._lock = asyncio.Lock()
+        self.configure(tts_cfg)
+        self.service = None
+        if data_dir:
+            from .tts_service import TTSService  # aiohttp is only needed when the server is supervised
+
+            self.service = TTSService(self.cfg.get("server", {}), data_dir)
+
+    def configure(self, tts_cfg: dict) -> None:
+        """(Re)read the finished [tts] config: engine, voices, team profiles, fallback voice."""
         self.cfg = tts_cfg
         self.engine = self._make(tts_cfg.get("engine", "dummy"))
         self.voices: dict = tts_cfg.get("voices", {})
         # team (or "default") -> voice profile id on the TTS server; editable from the panel
         self.team_profiles: dict[str, str] = dict(tts_cfg.get("team_profiles", {}))
-        self.error: str | None = None
         self._fallback_cfg = tts_cfg.get("sapi" if sys.platform == "win32" else "dummy", {})
-        self._lock = asyncio.Lock()
 
     def _make(self, name: str) -> Engine:
         if name not in ENGINES:
             raise ValueError(f"engine TTS desconhecida: {name} (opções: {', '.join(ENGINES)})")
         return ENGINES[name](self.cfg.get(name, {}))
+
+    def set_team_profile(self, team: str, profile: str | None) -> None:
+        """Pick the voice profile of a team (or "default"); None clears it."""
+        if profile is None:
+            self.team_profiles.pop(team, None)
+        else:
+            self.team_profiles[team] = profile
+
+    def voice_key(self, team: str | None) -> str:
+        """Identifies the voice a team gets right now (engine + voice), e.g. to cache a clip."""
+        return json.dumps([self.engine.name, team, self.voice_for(team)], sort_keys=True)
 
     async def set_engine(self, name: str) -> None:
         """Switch engines at runtime (loads the new one first, keeps the old one on failure)."""
@@ -212,6 +238,16 @@ class TTS:
             self.engine = (SapiEngine if sys.platform == "win32" else DummyEngine)(self._fallback_cfg)
         log.info("TTS pronto (engine=%s)", self.engine.name)
 
+    async def start(self) -> None:
+        """Load the engine, then start the TTS server if it is set to autostart."""
+        await self.load()
+        if self.service and self.service.autostart:
+            await self.service.start()
+
+    async def close(self) -> None:
+        if self.service:
+            await self.service.close()
+
     async def synthesize(self, text: str, team: str | None) -> bytes:
         await self._lock.acquire()
         reentrant = self.engine.reentrant
@@ -226,3 +262,6 @@ class TTS:
             else:
                 work.add_done_callback(lambda _: self._lock.release())
             work.add_done_callback(lambda f: f.cancelled() or f.exception())  # an abandoned failure is fine
+
+
+TTS = Synthesizer  # old name

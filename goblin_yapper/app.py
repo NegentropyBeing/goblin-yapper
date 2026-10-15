@@ -117,7 +117,7 @@ class App:
         self.now = time.monotonic
         self.last_seen: dict[str, float] = {}    # chatter in the game -> time of their last chat message
         self.voice_since: dict[str, float] = {}  # speaker -> when they got the voice
-        self.tts.team_profiles.update(self.cfg.get("tts", {}).get("team_profiles", {}))
+        self.tts.configure(self.cfg.get("tts", {}))  # settings.json may override engine, voices, profiles
         self.tints = load_tints(tcfg)
         # team (pinned) OBS sources hide their goblin while the team has nobody with the voice
         self.hide_idle = bool(self.cfg.get("overlay", {}).get("hide_idle", False))
@@ -142,7 +142,6 @@ class App:
         self._synth: asyncio.Future | None = None
         self._skipped = False
         self.pending: Counter[str] = Counter()  # queued utterances per user
-        self.tts_service = None  # TTSService, set by __main__
         self.channel: str = ""
         self.chat_status = "desligado"
         self.chat_task: asyncio.Task | None = None
@@ -333,7 +332,7 @@ class App:
         for team in list(self.sorter.teams):
             part = replace(utt, id=next(self.ids), team=team)
             # per team: without a profile the TTS server makes up a voice on each generation
-            key = json.dumps([self.tts.engine.name, team, self.tts.voice_for(team)], sort_keys=True)
+            key = self.tts.voice_key(team)
             wav = self._chorus_wavs.get(key)
             if wav is None:
                 wav = await self._generate(part)
@@ -604,10 +603,7 @@ class App:
             team = args[0].lower()
             if team != "default" and team not in self.tints:
                 raise SorterError(f"time desconhecido: {team}")
-            if args[1].lower() == "none":
-                self.tts.team_profiles.pop(team, None)
-            else:
-                self.tts.team_profiles[team] = args[1]
+            self.tts.set_team_profile(team, None if args[1].lower() == "none" else args[1])
             # replace (not merge) so removals are saved too
             self.settings.setdefault("tts", {})["team_profiles"] = dict(self.tts.team_profiles)
             self.persist({})

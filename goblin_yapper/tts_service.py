@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 
+from .tts import DEFAULT_SERVER_URL
 from .tts_install import VoiceInstaller
 
 log = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 class TTSService:
     def __init__(self, cfg: dict, data_dir: Path):
-        self.url = cfg.get("url", "http://127.0.0.1:8766").rstrip("/")
+        self.url = cfg.get("url", DEFAULT_SERVER_URL).rstrip("/")
         self.autostart = cfg.get("autostart", True)
         self.engine = cfg.get("engine", "omnivoice")
         self.installer = VoiceInstaller()

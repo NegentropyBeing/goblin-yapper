@@ -10,6 +10,8 @@ from goblin_yapper.tts import TTS, wav_duration
 from goblin_yapper.twitch import ChatMessage, parse_line
 from goblin_yapper.voice import VoiceController
 
+from .fakes import Sock, StuckEngine
+
 
 def sorter(n=4, people=0, open_=True):
     s = TeamSorter(n, rng=random.Random(1))
@@ -312,16 +314,6 @@ def test_multivoice_toggle_and_per_speaker_queue_limit(tmp_path):
     asyncio.run(run())
 
 
-class Sock:
-    """Stands in for a websocket: records what the server sent it."""
-
-    def __init__(self):
-        self.sent = []
-
-    async def send_str(self, data):
-        self.sent.append(json.loads(data))
-
-
 def _app_with_overlays(**overlays):
     """overlays: name -> (pinned team | None, audio on?). Also connects a panel (no hello)."""
     app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}))
@@ -522,26 +514,6 @@ def test_rotation_in_multi_mode_and_idle_speaker_is_replaced():
     asyncio.run(run())
 
 
-class _StuckEngine:
-    """First call hangs until released; later calls answer at once."""
-    name = "stuck"
-
-    def __init__(self, reentrant):
-        import threading
-
-        self.reentrant = reentrant
-        self.release = threading.Event()
-        self.calls = []
-
-    def synthesize(self, text, voice):
-        from goblin_yapper.tts import DummyEngine
-
-        self.calls.append(text)
-        if len(self.calls) == 1:
-            self.release.wait(10)
-        return DummyEngine({}).synthesize(text, voice)
-
-
 async def _until(cond, timeout=5.0):
     for _ in range(int(timeout / 0.01)):
         if cond():
@@ -561,7 +533,7 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
 
     async def run():
         app = App({}, TTS({"engine": "dummy"}))
-        engine = app.tts.engine = _StuckEngine(reentrant)
+        engine = app.tts.engine = StuckEngine(reentrant)
         ws = FakeWS()
         app.clients.add(ws)
         worker = asyncio.create_task(app.speech_worker())
@@ -594,7 +566,7 @@ def test_skip_drops_the_line_stuck_in_generation_and_the_queue_goes_on(reentrant
 def test_stop_also_frees_a_generation_in_progress():
     async def run():
         app = App({}, TTS({"engine": "dummy"}))
-        engine = app.tts.engine = _StuckEngine(True)
+        engine = app.tts.engine = StuckEngine(True)
         worker = asyncio.create_task(app.speech_worker())
         await app.say("ana", "travada")
         await _until(lambda: app.generating is not None and engine.calls)
