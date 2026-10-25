@@ -161,6 +161,40 @@ transcript are the source, so another engine can rebuild its own cache from them
 `engines/__init__.py`, and set `[tts.server] engine = "<name>"`. The Voz tab builds its form from the engine's
 `params()`, so nothing in the app needs to change.
 
+### Trying Qwen3-TTS (experimental)
+
+[Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) is a second server engine (`engines/qwen_engine.py`), for
+comparing it with OmniVoice. It only runs from source, and needs its own environment, because `qwen-tts` pins
+an older `transformers` than OmniVoice:
+
+```powershell
+.\tts_server\setup-qwen.ps1   # tts_server\.venv-qwen: PyTorch (CUDA 12.8) + qwen-tts
+```
+
+Then pick **Qwen3-TTS 1.7B** or **0.6B** in the **model** selector of the Voice tab (saved in `settings.json` as
+`[tts.server] engine` + `model`). The server restarts with it; lines that arrive while the model loads are not
+spoken. The first start downloads the model (~4.5 GB for 1.7B) and, on the first transcription, Whisper.
+
+- **Profiles are shared**: each engine keeps its own cached voice next to the reference clip
+  (`omnivoice.pt`, `qwen3tts-1.7b.pt`, `qwen3tts-0.6b.pt`), and builds the missing ones in the background when
+  it starts. Changing a transcript drops the other engines' caches, so each rebuilds from the new one.
+- **Parameters are per engine**, in `settings.json` and `profile.json` (`{"params": {"omnivoice": {...},
+  "qwen": {...}}}`).
+- Qwen always clones (from the reference clip and its transcript), so it needs a profile: the "no profile"
+  voice does not exist for it.
+- Load options in `[tts.server]`: `dtype` (default `bfloat16`) and `attn` (default `sdpa`).
+
+**Comparing**: with the server ready on one model, run
+
+```powershell
+python scripts\compare_tts.py --seed 42
+```
+
+It reads a fixed set of pt-BR chat lines with every profile, saving the audio in
+`compare\<model>\<profile>\` and the timings (generation time, real-time factor, VRAM) in
+`compare
+esults.csv`. Switch the model, run it again, and listen side by side.
+
 Other engines (`[tts] engine` in `config.toml`, or the switch in the Voz tab):
 
 | engine   | what it is                                                     |

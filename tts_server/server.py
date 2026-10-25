@@ -2,7 +2,7 @@
 
 Runs in its own Python environment (PyTorch + the TTS engine), started by the app.
 
-  python tts_server/server.py --data-dir DIR [--port 8766] [--engine omnivoice] [--parent-pid N]
+  python tts_server/server.py --data-dir DIR [--port 8766] [--engine omnivoice|qwen] [--model ID] [--parent-pid N]
 
   GET    /status                          state: loading | ready | error, plus GPU/VRAM info
   GET    /schema                          engine name + parameter definitions (the panel builds its form from it)
@@ -19,6 +19,9 @@ Runs in its own Python environment (PyTorch + the TTS engine), started by the ap
   POST   /synthesize                      {"text", "profile"?, "params"?, "global_params"?} -> audio/wav
 
 Parameter precedence: engine default < global settings < request global_params < profile params < request params.
+
+Profiles are shared by the engines (see profiles.py). Once the model is loaded, the server builds this engine's
+cached voice for every profile that lacks it, one at a time; a line for a profile still without one builds it first.
 """
 
 from __future__ import annotations
@@ -54,16 +57,19 @@ class TTSServer:
         shutil.rmtree(self.drafts_dir, ignore_errors=True)  # drafts don't survive restarts
         self.drafts_dir.mkdir(parents=True)
         self.engine = get_engine(engine_name)(engine_cfg)
-        self.params = Params(self.engine.params, data_dir / "settings.json")
+        self.params = Params(self.engine.params, data_dir / "settings.json", self.engine.name)
         self.profiles = ProfileStore(self.profiles_dir, self.engine.profile_cache, self.params, self.engine.name)
         self.state, self.error = "loading", None
         self.busy = None  # what the GPU is doing right now
         self.lock = asyncio.Lock()
         self._asr_timer: asyncio.TimerHandle | None = None
+        self._building: dict[str, asyncio.Task] = {}  # profile id -> the build of its missing cached voice
 
     # ---- lifecycle -----------------------------------------------------
 
     def load_in_background(self) -> None:
+        loop = asyncio.get_running_loop()
+
         def run():
             t = time.time()
             try:
@@ -73,8 +79,31 @@ class TTSServer:
             except Exception as e:
                 log.exception("failed to load the model")
                 self.state, self.error = "error", f"{type(e).__name__}: {e}"
+                return
+            asyncio.run_coroutine_threadsafe(self.build_missing_voices(), loop)
 
         threading.Thread(target=run, daemon=True).start()
+
+    async def build(self, wav: Path, ref_text: str, cache: Path) -> None:
+        await self.gpu("creating profile", self.engine.build_profile, wav, ref_text, cache)
+
+    async def ensure_voice(self, pid: str) -> None:
+        """Build this engine's cached voice for a profile that lacks it; a build already running is shared."""
+        if self.profiles.read(pid)["ready"]:
+            return
+        task = self._building.get(pid)
+        if task is None:
+            log.info("building the %s voice of profile %s", self.engine.label, pid)
+            task = self._building[pid] = asyncio.ensure_future(self.profiles.build_missing(pid, self.build))
+            task.add_done_callback(lambda _: self._building.pop(pid, None))
+        await asyncio.shield(task)
+
+    async def build_missing_voices(self) -> None:
+        for pid in self.profiles.missing():
+            try:
+                await self.ensure_voice(pid)
+            except Exception:
+                log.exception("failed to build the voice of profile %s", pid)
 
     def require_ready(self) -> None:
         if self.state != "ready":
@@ -172,13 +201,9 @@ def make_app(srv: TTSServer) -> web.Application:
     async def create_profile(request):
         body = await request.json()
         d = draft_dir(str(body.get("draft_id", "")))
-
-        async def build(wav, ref_text, cache):
-            await srv.gpu("creating profile", srv.engine.build_profile, wav, ref_text, cache)
-
         try:
             meta = await srv.profiles.create(d, str(body.get("name", "")), str(body.get("ref_text", "")),
-                                             body.get("params", {}), build)
+                                             body.get("params", {}), srv.build)
         except (web.HTTPException, ProfileError):
             raise
         except Exception as e:
@@ -224,6 +249,8 @@ def make_app(srv: TTSServer) -> web.Application:
             raise web.HTTPBadRequest(text="texto vazio")
         cache, profile_params = None, {}
         if body.get("profile"):
+            srv.require_ready()
+            await srv.ensure_voice(str(body["profile"]))
             cache, profile_params = srv.profiles.for_synthesis(str(body["profile"]))
         # "global_params" previews unsaved global settings: they sit below the profile's own params.
         params = srv.params.resolve(body.get("global_params") or {}, profile_params, body.get("params") or {})
@@ -274,7 +301,8 @@ async def watch_parent(pid: int) -> None:
 
 async def main(args) -> None:
     data_dir = Path(args.data_dir).resolve()
-    srv = TTSServer(data_dir, args.engine, {"model": args.model, "device": args.device, "dtype": args.dtype})
+    cfg = {k: v for k, v in (("model", args.model), ("device", args.device), ("dtype", args.dtype), ("attn", args.attn)) if v}
+    srv = TTSServer(data_dir, args.engine, cfg)
     runner = web.AppRunner(make_app(srv), access_log=None)
     await runner.setup()
     await web.TCPSite(runner, "127.0.0.1", args.port).start()
@@ -290,9 +318,10 @@ def cli() -> None:
     p.add_argument("--data-dir", required=True)
     p.add_argument("--port", type=int, default=8766)
     p.add_argument("--engine", default="omnivoice")
-    p.add_argument("--model", default="k2-fsa/OmniVoice")
-    p.add_argument("--device", default="cuda:0")
-    p.add_argument("--dtype", default="float16")
+    p.add_argument("--model", help="model id or folder (default: the engine's own)")
+    p.add_argument("--device", help="e.g. cuda:0 or cpu (default: cuda:0)")
+    p.add_argument("--dtype", help="float16 | bfloat16 | float32 (default: the engine's own)")
+    p.add_argument("--attn", help="attention implementation, e.g. sdpa (qwen only; default: sdpa)")
     p.add_argument("--parent-pid", type=int)
     args = p.parse_args()
     data_dir = Path(args.data_dir)

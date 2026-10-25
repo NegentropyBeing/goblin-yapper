@@ -3,10 +3,14 @@
 If something already answers at the configured URL (e.g. you started the TTS server by
 hand), it is used as is and not managed.
 
+Which model it runs is picked in the Voice tab (MODELS; saved as [tts.server] engine + model). Switching
+restarts the server, which frees the old model's VRAM: one model is loaded at a time.
+
 Which Python environment runs it, in order:
   1. [tts.server] python (+ script) from the config
-  2. running from source with tts_server/.venv present (made by tts_server/setup.ps1)
-  3. the voice runtime the app installs on first use (tts_install.py, %LOCALAPPDATA%)
+  2. Qwen3-TTS: tts_server/.venv-qwen (made by tts_server/setup-qwen.ps1, running from source only)
+  3. OmniVoice from source with tts_server/.venv present (made by tts_server/setup.ps1)
+  4. OmniVoice: the voice runtime the app installs on first use (tts_install.py, %LOCALAPPDATA%)
 """
 
 from __future__ import annotations
@@ -29,6 +33,21 @@ log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# The models the Voice tab offers: id -> the server's --engine and --model (None = the engine's default)
+MODELS = {
+    "omnivoice": {"engine": "omnivoice", "model": None, "label": "OmniVoice"},
+    "qwen-1.7b": {"engine": "qwen", "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "label": "Qwen3-TTS 1.7B"},
+    "qwen-0.6b": {"engine": "qwen", "model": "Qwen/Qwen3-TTS-12Hz-0.6B-Base", "label": "Qwen3-TTS 0.6B"},
+}
+# The model the server loads when it is given none (tts_server/engines)
+ENGINE_DEFAULTS = {"qwen": "Qwen/Qwen3-TTS-12Hz-1.7B-Base"}
+# Each engine's environment when running from source, and the script that makes it
+DEV_ENVS = {"omnivoice": (".venv", "setup.ps1"), "qwen": (".venv-qwen", "setup-qwen.ps1")}
+
+
+def setup_script(engine: str) -> str:
+    return "tts_server\\" + DEV_ENVS[engine][1]
+
 
 class ServiceError(MessageError, RuntimeError):
     """The operator asked for something the voice server can't do right now."""
@@ -36,31 +55,72 @@ class ServiceError(MessageError, RuntimeError):
 
 class TTSService:
     def __init__(self, cfg: dict, data_dir: Path):
+        self.cfg = cfg
         self.url = cfg.get("url", DEFAULT_SERVER_URL).rstrip("/")
         self.autostart = cfg.get("autostart", True)
         self.engine = cfg.get("engine", "omnivoice")
+        self.model = cfg.get("model") or None
         self.installer = VoiceInstaller()
-        dev_python = PROJECT_ROOT / "tts_server" / ".venv" / "Scripts" / "python.exe"
-        self.uses_runtime = False
-        if cfg.get("python"):
-            self.python = Path(cfg["python"])
-            self.script = Path(cfg.get("script") or PROJECT_ROOT / "tts_server" / "server.py")
-        elif not getattr(sys, "frozen", False) and dev_python.exists() and not cfg.get("use_runtime"):
-            self.python, self.script = dev_python, PROJECT_ROOT / "tts_server" / "server.py"
-        else:
-            self.uses_runtime = True
-            self.python, self.script = self.installer.python, self.installer.server_dir / "server.py"
+        self.python, self.script, self.uses_runtime = self._environment(self.engine)
         self.data_dir = data_dir / "tts"
         self.stderr_path = self.data_dir / "tts-server.stderr"
         self.proc: asyncio.subprocess.Process | None = None
         self.mode = "stopped"  # stopped | managed | external | not_installed | exited
         self.session: aiohttp.ClientSession | None = None
 
+    def _environment(self, engine: str) -> tuple[Path, Path, bool]:
+        """(python, server script, whether it is the installed voice runtime) for an engine."""
+        server = PROJECT_ROOT / "tts_server" / "server.py"
+        if self.cfg.get("python"):
+            return Path(self.cfg["python"]), Path(self.cfg.get("script") or server), False
+        env, _ = DEV_ENVS.get(engine, DEV_ENVS["omnivoice"])
+        dev_python = PROJECT_ROOT / "tts_server" / env / "Scripts" / "python.exe"
+        if engine != "omnivoice":  # the installed runtime only has OmniVoice
+            return dev_python, server, False
+        if not getattr(sys, "frozen", False) and dev_python.exists() and not self.cfg.get("use_runtime"):
+            return dev_python, server, False
+        return self.installer.python, self.installer.server_dir / "server.py", True
+
+    def _installed(self, engine: str) -> bool:
+        python, script, runtime = self._environment(engine)
+        return self.installer.installed if runtime else python.exists() and script.exists()
+
     @property
     def installed(self) -> bool:
-        if self.uses_runtime:
-            return self.installer.installed
-        return self.python.exists() and self.script.exists()
+        return self._installed(self.engine)
+
+    @property
+    def choice(self) -> str | None:
+        """The MODELS id of what the server runs (None for an engine/model set by hand in the config)."""
+        default = lambda engine: ENGINE_DEFAULTS.get(engine)  # noqa: E731
+        current = self.model or default(self.engine)
+        return next((mid for mid, m in MODELS.items()
+                     if m["engine"] == self.engine and (m["model"] or default(m["engine"])) == current), None)
+
+    def models(self) -> list[dict]:
+        """What the Voice tab offers; a model whose environment is missing comes with the script that makes it."""
+        out = []
+        for mid, m in MODELS.items():
+            item = {"id": mid, "label": m["label"], "installed": self._installed(m["engine"])}
+            if not item["installed"] and m["engine"] != "omnivoice":
+                item["setup"] = setup_script(m["engine"])
+            out.append(item)
+        return out
+
+    async def set_model(self, mid: str) -> None:
+        """Run another model: restarts the server with it (lines arriving meanwhile are not spoken)."""
+        if mid not in MODELS:
+            raise ServiceError("tts.unknown_model", model=mid)
+        if self.mode == "external":
+            raise ServiceError("tts.external_restart")
+        m = MODELS[mid]
+        if not self._installed(m["engine"]):
+            raise ServiceError("tts.model_not_installed", model=m["label"], script=setup_script(m["engine"]))
+        await self.stop()
+        self.engine, self.model = m["engine"], m["model"]
+        self.python, self.script, self.uses_runtime = self._environment(self.engine)
+        log.info("switching the voice model to %s", m["label"])
+        await self.start()
 
     async def _alive(self) -> bool:
         try:
@@ -89,12 +149,20 @@ class TTSService:
         with open(self.stderr_path, "wb") as err:
             self.proc = await asyncio.create_subprocess_exec(
                 str(self.python), str(self.script), "--data-dir", str(self.data_dir), "--port", port,
-                "--engine", self.engine, "--parent-pid", str(os.getpid()),
+                "--engine", self.engine, *self._model_args(), "--parent-pid", str(os.getpid()),
                 stdout=subprocess.DEVNULL, stderr=err,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.mode = "managed"
         log.info("TTS server started (pid %s), log at %s", self.proc.pid, self.data_dir / "tts-server.log")
         asyncio.get_running_loop().create_task(self._watch(self.proc))
+
+    def _model_args(self) -> list[str]:
+        """--model, and the load-time options set by hand in [tts.server] (dtype, attn)."""
+        out = ["--model", self.model] if self.model else []
+        for key in ("dtype", "attn"):
+            if self.cfg.get(key):
+                out += [f"--{key}", str(self.cfg[key])]
+        return out
 
     async def _watch(self, proc) -> None:
         code = await proc.wait()
@@ -146,7 +214,8 @@ class TTSService:
 
     async def status(self) -> dict:
         out = {"mode": self.mode, "url": self.url, "log": str(self.data_dir / "tts-server.log"),
-               "can_install": self.uses_runtime, "install": self.installer.status()}
+               "can_install": self.uses_runtime, "install": self.installer.status(),
+               "model": self.choice, "models": self.models()}
         if self.mode in ("managed", "external") and self.session:
             try:
                 async with self.session.get(f"{self.url}/status", timeout=aiohttp.ClientTimeout(total=2)) as r:

@@ -283,6 +283,9 @@
         <option value="dummy" data-i18n="vz.engine_dummy"></option>
       </select>
     </label>
+    <label class="pill" id="vzModelPill" hidden><span data-i18n="vz.model"></span>
+      <select id="vzModel"></select>
+    </label>
     <button id="vzPurgeAsr" hidden data-i18n="btn.purge_whisper" data-i18n-title="tip.purge_whisper"></button>
     <button id="vzPower" disabled></button>
     <button id="vzRestart" data-i18n="btn.restart_server"></button>
@@ -737,7 +740,8 @@ fetch("/api/state").then(r => r.json()).then(s => { state = s; return applyState
 // ---- Voz tab ---------------------------------------------------------
 // Talks to the TTS server through the backend's /api/tts/* proxy.
 const vz = { schema: null, settings: { params: {} }, profiles: [], status: null, draft: null,
-             scope: "global", form: {}, dirty: false, timer: null, loaded: false, teamsKey: "" };
+             scope: "global", form: {}, dirty: false, timer: null, loaded: false, teamsKey: "",
+             switching: null /* label of the model being switched to, until it is ready */ };
 const profileAudio = new Audio();
 
 // An error body from this app is {key, params, text}; anything else (the voice server's own errors) is shown as it came.
@@ -802,6 +806,7 @@ function renderVzStatus() {
   else if (st.mode === "offline") { dot = "bad"; text = t("vz.s.offline"); }
   else if (st.mode === "stopped") { text = t("vz.s.stopped"); }
   else if (st.mode === "disabled") { text = t("vz.s.disabled"); }
+  else if (vz.switching && sv.state !== "ready" && sv.state !== "error") { dot = "warn"; text = t("vz.s.switching", { model: vz.switching }); }
   else if (sv.state === "ready") {
     dot = "ok";
     text = [sv.label, t("vz.s.ready"), sv.gpu, sv.vram_model_gb != null ? t("vz.s.model_uses", { gb: sv.vram_model_gb }) : "",
@@ -810,6 +815,8 @@ function renderVzStatus() {
             st.mode === "external" ? t("vz.s.external") : ""].filter(Boolean).join(" · ");
   } else if (sv.state === "error") { dot = "bad"; text = t("vz.s.error"); banner = `${esc(sv.error)}<br>${t("vz.log_line", { log: st.log }, true)}`; }
   else { dot = "warn"; text = t("vz.s.loading"); }
+  if (sv.state === "ready" || sv.state === "error") vz.switching = null;
+  renderVzModels(st);
   $("#vzProfilesDir").textContent = sv.profiles_dir ? t("vz.profiles_dir", { dir: sv.profiles_dir }) : "";
   $("#vzDot").className = "dot " + dot;
   $("#vzStatusText").textContent = text;
@@ -824,6 +831,20 @@ function renderVzStatus() {
   $("#vzPower").disabled = !off && st.mode !== "managed";
   $("#vzDrop").classList.toggle("disabled", sv.state !== "ready");
   $("#vzSpeak").disabled = sv.state !== "ready";
+}
+
+// The voice model the server runs (only for the server the app itself manages)
+function renderVzModels(st) {
+  const models = st.models || [];
+  $("#vzModelPill").hidden = !models.length || state.tts_engine !== "server";
+  if (!models.length || document.activeElement === $("#vzModel")) return;
+  const opts = models.map(m => `<option value="${esc(m.id)}"${m.installed ? "" : " disabled"}>${esc(
+    m.installed ? m.label : t("vz.model_missing", { label: m.label, script: m.setup || "" }))}</option>`);
+  if (!st.model) opts.unshift(`<option value="" disabled>${esc(t("vz.model_custom", { engine: st.server?.label || "?" }))}</option>`);
+  const html = opts.join("");
+  if ($("#vzModel").dataset.html !== html) { $("#vzModel").innerHTML = html; $("#vzModel").dataset.html = html; }
+  $("#vzModel").value = st.model || "";
+  $("#vzModel").disabled = st.mode === "external" || !!vz.switching;
 }
 
 async function vzLoadAll() {
@@ -1156,6 +1177,15 @@ $("#vzPower").addEventListener("click", async (e) => {
   catch (err) { toast(err.message, true); renderVzStatus(); }
 });
 $("#vzEngine").addEventListener("change", (e) => cmd(`engine ${e.target.value}`));
+$("#vzModel").addEventListener("change", async (e) => {
+  const m = (vz.status.models || []).find(x => x.id === e.target.value);
+  if (!m || !confirm(t("confirm.switch_model", { model: m.label }))) { e.target.blur(); renderVzStatus(); return; }
+  e.target.blur();
+  vz.switching = m.label; vz.loaded = false;
+  try { vz.status = await api("/api/tts-service/model", jsonOpts("POST", { id: m.id })); toast(t("toast.switching", { model: m.label })); }
+  catch (err) { vz.switching = null; toast(err.message, true); }
+  renderVzStatus();
+});
 $("#vzTeams").addEventListener("change", (e) => {
   const sel = e.target.closest("[data-team-voice]");
   if (sel) cmd(`teamvoice ${sel.dataset.teamVoice} ${sel.value}`, { quiet: true });

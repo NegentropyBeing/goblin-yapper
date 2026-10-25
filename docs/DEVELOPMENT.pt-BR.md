@@ -160,6 +160,40 @@ transcrição são a fonte, então outra engine pode reconstruir o próprio cach
 `engines/__init__.py` e defina `[tts.server] engine = "<nome>"`. A aba Voz monta o formulário a partir do
 `params()` da engine, então nada no app precisa mudar.
 
+### Testando o Qwen3-TTS (experimental)
+
+O [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) é uma segunda engine do servidor (`engines/qwen_engine.py`),
+para compará-lo com o OmniVoice. Ele só roda a partir do código-fonte e precisa de um ambiente próprio, porque o
+`qwen-tts` fixa um `transformers` mais antigo que o do OmniVoice:
+
+```powershell
+.\tts_server\setup-qwen.ps1   # tts_server\.venv-qwen: PyTorch (CUDA 12.8) + qwen-tts
+```
+
+Depois escolha **Qwen3-TTS 1.7B** ou **0.6B** no seletor de **modelo** da aba Voz (fica salvo no `settings.json`
+como `[tts.server] engine` + `model`). O servidor reinicia com ele; as falas que chegarem enquanto o modelo
+carrega não são lidas. A primeira vez baixa o modelo (~4,5 GB para o 1.7B) e, na primeira transcrição, o Whisper.
+
+- **Os perfis são compartilhados**: cada engine guarda a própria voz em cache ao lado do áudio de referência
+  (`omnivoice.pt`, `qwen3tts-1.7b.pt`, `qwen3tts-0.6b.pt`) e gera as que faltam em segundo plano ao iniciar.
+  Mudar uma transcrição apaga os caches das outras engines, para que cada uma refaça o seu a partir da nova.
+- **Os parâmetros são por engine**, no `settings.json` e no `profile.json` (`{"params": {"omnivoice": {...},
+  "qwen": {...}}}`).
+- O Qwen sempre clona (a partir do áudio de referência e da transcrição), então precisa de um perfil: a voz
+  "sem perfil" não existe para ele.
+- Opções de carregamento em `[tts.server]`: `dtype` (padrão `bfloat16`) e `attn` (padrão `sdpa`).
+
+**Comparando**: com o servidor pronto em um modelo, rode
+
+```powershell
+python scripts\compare_tts.py --seed 42
+```
+
+Ele lê um conjunto fixo de falas de chat em pt-BR com cada perfil, salvando o áudio em
+`compare\<modelo>\<perfil>\` e os tempos (tempo de geração, fator de tempo real, VRAM) em
+`compare
+esults.csv`. Troque o modelo, rode de novo e ouça lado a lado.
+
 Outras engines (`[tts] engine` no `config.toml`, ou a troca na aba Voz):
 
 | engine   | o que é                                                         |

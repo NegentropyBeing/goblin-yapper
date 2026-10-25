@@ -16,6 +16,7 @@
   POST   /api/tts-service/stop     turn the voice model off (ends the TTS server process, freeing its VRAM)
   POST   /api/tts-service/start    turn it back on
   POST   /api/tts-service/install  first-run install of the voice runtime (installed app)
+  POST   /api/tts-service/model    {"id": "omnivoice" | "qwen-1.7b" | ...}: run another voice model (restarts the server)
   *      /api/tts/<path>       forwarded to the TTS server (profiles, pipeline, schema, settings, synthesize)
 """
 
@@ -174,6 +175,19 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
             raise fail(web.HTTPConflict, e) if isinstance(e, MessageError) else web.HTTPConflict(text=str(e))
         return web.json_response(await svc.status())
 
+    async def tts_service_model(request):
+        svc = service()
+        try:
+            body = await request.json()
+        except ValueError:
+            raise fail(web.HTTPBadRequest, "http.bad_json")
+        try:
+            await svc.set_model(str(body.get("id", "")))
+        except RuntimeError as e:
+            raise fail(web.HTTPConflict, e) if isinstance(e, MessageError) else web.HTTPConflict(text=str(e))
+        app.persist({"tts": {"server": {"engine": svc.engine, "model": svc.model}}})
+        return web.json_response(await svc.status())
+
     async def tts_proxy(request):
         svc = app.tts.service
         if svc is None or svc.session is None:
@@ -206,6 +220,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         web.post("/api/tts-service/stop", service_action("turn_off")),
         web.post("/api/tts-service/start", service_action("start")),
         web.post("/api/tts-service/install", tts_service_install),
+        web.post("/api/tts-service/model", tts_service_model),
         web.route("*", "/api/tts/{tail:.*}", tts_proxy),
         web.static("/assets", assets_dir),
         web.static("/web", WEB_DIR),

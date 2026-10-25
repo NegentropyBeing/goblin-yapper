@@ -1,0 +1,6 @@
+# Installed by setup-qwen.ps1 after PyTorch (CUDA 12.8 build, needed for RTX 50xx), in tts_server/.venv-qwen.
+# Its own environment: qwen-tts pins transformers 4.57.3, OmniVoice needs 5.x.
+qwen-tts==0.1.1
+hf_xet             # faster model downloads from the Hugging Face hub
+aiohttp>=3.9
+soundfile>=0.12

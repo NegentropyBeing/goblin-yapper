@@ -39,7 +39,7 @@ TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
 RUNTIME_VERSION = "1"  # bump when the runtime's packages change, to force a reinstall
 
 SERVER_FILES = ("server.py", "audio.py", "profiles.py", "requirements.txt", "engines/__init__.py", "engines/base.py",
-                "engines/omnivoice_engine.py")
+                "engines/omnivoice_engine.py", "engines/qwen_engine.py")
 
 
 def bundled_server_dir() -> Path:

@@ -54,7 +54,8 @@ class Engine:
     name = "base"
     label = "base"
     sample_rate = 24000
-    # File name of the engine's cached voice inside a profile folder, e.g. "omnivoice.pt".
+    # File name of the engine's cached voice inside a profile folder, e.g. "omnivoice.pt". Profiles are
+    # shared by the engines, so it must be unique to the engine (and to the model, if voices differ per model).
     profile_cache = "voice.bin"
 
     def __init__(self, cfg: dict):

@@ -19,7 +19,7 @@ class P:
 
 
 def _params(tmp_path):
-    return Params(lambda: [P("speed", 1.0, 0.5, 2.0), P("temp", 0.7)], tmp_path / "settings.json")
+    return Params(lambda: [P("speed", 1.0, 0.5, 2.0), P("temp", 0.7)], tmp_path / "settings.json", "fake")
 
 
 def _draft(tmp_path, name="d1"):
@@ -131,5 +131,97 @@ def test_delete_returns_the_name_and_unknown_or_unsafe_ids_are_not_found(tmp_pat
             with pytest.raises(NotFound):
                 store.read(pid)
         assert NotFound.status == 404
+
+    asyncio.run(run())
+
+
+# ---- shared by every engine: parameters per engine, each engine's own cached voice
+
+
+def _profile_dir(tmp_path, pid="velho-0001", params=None, engine="omnivoice", caches=("omnivoice.pt",)):
+    """A profile folder as an earlier version left it."""
+    d = tmp_path / "profiles" / pid
+    d.mkdir(parents=True)
+    meta = {"id": pid, "name": "Velho", "ref_text": "olá", "created": 1.0, "duration": 1.0,
+            "engine": engine, "params": params if params is not None else {"speed": 1.2}}
+    (d / "profile.json").write_text(json.dumps(meta))
+    (d / "reference.wav").write_bytes(b"RIFF")
+    for c in caches:
+        (d / c).write_text("old")
+    return d
+
+
+def test_settings_from_before_are_omnivoices_and_each_engine_keeps_its_own(tmp_path):
+    (tmp_path / "settings.json").write_text(json.dumps({"params": {"speed": 1.5}}))
+    omni = Params(lambda: [P("speed", 1.0)], tmp_path / "settings.json", "omnivoice")
+    qwen = Params(lambda: [P("temp", 0.9)], tmp_path / "settings.json", "qwen")
+    assert omni.settings() == {"params": {"speed": 1.5}}
+    assert qwen.settings() == {"params": {}} and qwen.resolve() == {"temp": 0.9}
+    assert qwen.save({"temp": 0.5, "speed": 2}) == {"params": {"temp": 0.5}}
+    assert json.loads((tmp_path / "settings.json").read_text()) == {"params": {"omnivoice": {"speed": 1.5}, "qwen": {"temp": 0.5}}}
+    assert omni.resolve() == {"speed": 1.5}
+
+
+def test_a_broken_settings_file_reads_as_empty(tmp_path):
+    (tmp_path / "settings.json").write_text("[1, 2]")
+    assert _params(tmp_path).settings() == {"params": {}}
+
+
+def test_profile_params_from_before_belong_to_the_engine_that_made_the_profile(tmp_path):
+    async def run():
+        _profile_dir(tmp_path)
+        params = Params(lambda: [P("temp", 0.9)], tmp_path / "settings.json", "qwen")
+        qwen = ProfileStore(tmp_path / "profiles", "qwen3tts.pt", params, "qwen")
+        omni = ProfileStore(tmp_path / "profiles", "omnivoice.pt", _params(tmp_path), "omnivoice")
+        assert omni.read("velho-0001")["params"] == {"speed": 1.2}
+        meta = qwen.read("velho-0001")
+        assert meta["params"] == {} and meta["ready"] is False
+        await qwen.update("velho-0001", {"params": {"temp": 0.3}}, _build)
+        on_disk = json.loads((tmp_path / "profiles" / "velho-0001" / "profile.json").read_text())
+        assert on_disk["params"] == {"omnivoice": {"speed": 1.2}, "qwen": {"temp": 0.3}}
+        assert omni.read("velho-0001")["params"] == {"speed": 1.2} and qwen.read("velho-0001")["params"] == {"temp": 0.3}
+
+    asyncio.run(run())
+
+
+def test_another_engine_sees_the_profile_and_builds_its_missing_voice(tmp_path):
+    async def run():
+        d = _profile_dir(tmp_path)
+        qwen = ProfileStore(tmp_path / "profiles", "qwen3tts.pt", _params(tmp_path), "qwen")
+        assert qwen.missing() == ["velho-0001"]
+        await qwen.build_missing("velho-0001", _build)
+        assert (d / "qwen3tts.pt").read_text() == "olá" and (d / "omnivoice.pt").read_text() == "old"
+        assert qwen.missing() == [] and qwen.read("velho-0001")["ready"] is True
+
+        async def never(*_):
+            raise AssertionError("already built")
+
+        await qwen.build_missing("velho-0001", never)
+
+    asyncio.run(run())
+
+
+def test_a_new_transcript_drops_the_other_engines_stale_voices(tmp_path):
+    async def run():
+        d = _profile_dir(tmp_path, caches=("omnivoice.pt", "qwen3tts-0.6b.pt", "qwen3tts-1.7b.pt"))
+        qwen = ProfileStore(tmp_path / "profiles", "qwen3tts-1.7b.pt", _params(tmp_path), "qwen")
+        await qwen.update("velho-0001", {"ref_text": "novo"}, _build)
+        assert sorted(f.name for f in d.iterdir()) == ["profile.json", "qwen3tts-1.7b.pt", "reference.wav"]
+        assert (d / "qwen3tts-1.7b.pt").read_text() == "novo"
+
+    asyncio.run(run())
+
+
+def test_a_failed_rebuild_keeps_every_voice(tmp_path):
+    async def run():
+        d = _profile_dir(tmp_path, caches=("omnivoice.pt", "qwen3tts.pt"))
+        qwen = ProfileStore(tmp_path / "profiles", "qwen3tts.pt", _params(tmp_path), "qwen")
+
+        async def boom(*_):
+            raise RuntimeError("sem GPU")
+
+        with pytest.raises(RuntimeError):
+            await qwen.update("velho-0001", {"ref_text": "novo"}, boom)
+        assert (d / "omnivoice.pt").exists() and qwen.read("velho-0001")["ref_text"] == "olá"
 
     asyncio.run(run())

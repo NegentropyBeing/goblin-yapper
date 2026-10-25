@@ -7,7 +7,7 @@ from goblin_yapper.tts_install import SERVER_FILES
 
 ROOT = Path(__file__).resolve().parent.parent
 TTS = ROOT / "tts_server"
-SOURCES = sorted(p.relative_to(TTS).as_posix() for p in TTS.rglob("*.py") if ".venv" not in p.parts
+SOURCES = sorted(p.relative_to(TTS).as_posix() for p in TTS.rglob("*.py") if not any(x.startswith(".venv") for x in p.parts)
                  and "__pycache__" not in p.parts)
 
 

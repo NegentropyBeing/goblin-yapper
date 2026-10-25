@@ -6,6 +6,10 @@ def get_engine(name: str):
         from .omnivoice_engine import OmniVoiceEngine
 
         return OmniVoiceEngine
+    if name == "qwen":
+        from .qwen_engine import QwenEngine
+
+        return QwenEngine
     raise ValueError(f"engine desconhecida: {name}")
 
 
