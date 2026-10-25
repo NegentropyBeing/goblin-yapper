@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.7.1
+
+Windows installers: `Goblin Yapper_0.7.1_x64_en-US.msi` (English) and `Goblin Yapper_0.7.1_x64_pt-BR.msi`
+(Portuguese).
 
 - **Volume** slider (Goblin tab, next to the automatic options): how loud the goblins speak in OBS, and in the
 panel when no OBS source is open. Applies right away, even to the line playing, and is saved in `settings.json`
