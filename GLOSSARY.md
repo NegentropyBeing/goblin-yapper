@@ -28,6 +28,18 @@ _Avoid_: Draw, shuffle, raffle
 The turn to speak: while a viewer holds it, their chat messages are read aloud and their team's goblin talks. Also the synthetic voice used to do the reading. pt-BR: _voz_ ("dar a voz" = give the voice).
 _Avoid_: Mic, floor
 
+**Voice profile**:
+A synthetic voice cloned from a short reference recording and its transcript; each team can be given one. pt-BR: _perfil de voz_.
+_Avoid_: Voice model, preset, variable
+
+**Voice style**:
+A set of descriptive terms (gender, age, pitch, accent, whisper) that shape how a synthetic voice sounds, at most one per kind. pt-BR: _estilo de voz_.
+_Avoid_: Instruct, voice design, variable
+
+**Speech tag**:
+A bracketed mark in spoken text, such as `[laughter]` or `[sigh]`, that the voice turns into a non-verbal sound. pt-BR: _tag de fala_.
+_Avoid_: Nonverbal tag, emote, variable
+
 **Panel**:
 The operator's control window, where the queue, teams, voice and settings are managed. pt-BR: _painel_.
 _Avoid_: Dashboard, console

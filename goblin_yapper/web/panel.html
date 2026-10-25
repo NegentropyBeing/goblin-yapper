@@ -108,6 +108,17 @@
   .upload .label { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
   .drawer-body { max-height: 46vh; overflow: auto; }
 
+  /* hint menus: the voice style terms and speech tags, under the button that opened them */
+  #hintMenu { position: fixed; z-index: 15; width: min(340px, calc(100vw - 16px)); max-height: 60vh; overflow: auto;
+    display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: 0 8px 24px #0009; }
+  #hintMenu[hidden] { display: none; }
+  #hintMenu h3 { margin: 0; font-size: 13px; }
+  #hintMenu h4 { margin: 4px 0 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  #hintMenu .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  #hintMenu .chips button { padding: 2px 9px; font-size: 12px; border-radius: 999px; }
+  #hintMenu .chips button.on { background: var(--accent); border-color: var(--accent); color: #10140b; }
+  #hintMenu code { margin-left: 5px; font-size: 11px; color: var(--muted); }
   #toast { position: fixed; right: 16px; bottom: 16px; max-width: 420px; padding: 10px 14px; border-radius: var(--radius); background: var(--panel-2);
     border: 1px solid var(--line); white-space: pre-wrap; font-size: 13px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
   #toast.show { opacity: 1; transform: none; }
@@ -235,7 +246,7 @@
   <button class="danger" data-cmd="stop" id="stopAllBtn"></button>
   <button data-cmd="skip" id="skipBtn" disabled data-i18n="btn.skip" data-i18n-title="tip.skip"></button>
   <span class="pill" id="lineInfo"></span>
-  <form id="test"><input type="text" id="testText" data-i18n-placeholder="test.placeholder"><button data-i18n="btn.speak"></button></form>
+  <form id="test"><input type="text" id="testText" data-i18n-placeholder="test.placeholder"><button type="button" data-hints="tags" data-for="testText" data-i18n="btn.tag_hints" data-i18n-title="tip.tag_hints"></button><button data-i18n="btn.speak"></button></form>
 </section>
 
 <section id="autobar">
@@ -316,6 +327,7 @@
         <textarea id="vzRefText" rows="3" data-i18n-placeholder="vz.reftext_placeholder"></textarea>
         <div class="row">
           <input type="text" id="vzName" data-i18n-placeholder="vz.name_placeholder">
+          <button type="button" data-hints="tags" data-for="vzRefText" data-i18n="btn.tag_hints" data-i18n-title="tip.tag_hints"></button>
           <button class="primary" id="vzCreate" data-i18n="btn.create_profile"></button>
           <button id="vzCancel" data-i18n="btn.cancel"></button>
         </div>
@@ -344,6 +356,7 @@
       <textarea id="vzTestText" rows="3"></textarea>
       <div class="row">
         <select id="vzTestProfile"></select>
+        <button type="button" data-hints="tags" data-for="vzTestText" data-i18n="btn.tag_hints" data-i18n-title="tip.tag_hints"></button>
         <button class="primary" id="vzSpeak" data-i18n="btn.speak"></button>
       </div>
       <p class="hint" data-i18n="vz.test_hint"></p>
@@ -356,6 +369,7 @@
   </div>
 </div>
 
+<div id="hintMenu" hidden></div>
 <div id="toast"></div>
 <div id="offline" data-i18n="offline.connecting"></div>
 
@@ -454,6 +468,8 @@ function render() {
   renderSpeakers();
   $("#multiVoice").checked = state.multi_voice;
   $("#hideIdle").checked = state.hide_idle;
+  // speech tags are read by the voice server's engine only (not by the Windows voices)
+  document.querySelectorAll("[data-hints=tags]").forEach(b => { b.hidden = state.tts_engine !== "server"; });
   if (document.activeElement !== $("#volume")) $("#volume").value = state.volume;
   $("#volumeOut").textContent = `${$("#volume").value}%`;
   for (const line of lines.values()) if (line.audio) line.audio.volume = state.volume / 100;
@@ -883,7 +899,8 @@ function paramHtml(p) {
   if (p.type === "bool") ctl = `<input type="checkbox" data-param="${p.key}" ${val ? "checked" : ""}> <span class="hint">${val ? t("vz.on") : t("vz.off")}</span>`;
   else if (p.type === "select") ctl = `<select data-param="${p.key}">${p.options.map(o =>
     `<option value="${esc(o.value)}" ${o.value === val ? "selected" : ""}>${esc(o.value === "auto" ? t("param.language.auto") : o.label)}</option>`).join("")}</select>`;
-  else if (p.type === "text") ctl = `<input type="text" data-param="${p.key}" value="${esc(val ?? "")}">`;
+  else if (p.type === "text") ctl = `<input type="text" data-param="${p.key}" value="${esc(val ?? "")}">` +
+    (p.key === vz.schema.hints?.style_param ? `<button type="button" class="icon" data-hints="style" title="${esc(t("tip.style_hints"))}">${esc(t("btn.hints"))}</button>` : "");
   else ctl = `<input type="range" data-param="${p.key}" min="${p.min}" max="${p.max}" step="${p.step ?? (p.type === "int" ? 1 : 0.01)}" value="${val}"><output>${fmt(p, val)}</output>`;
   return `<div class="param ${over || vz.scope === "global" ? "" : "inherited"}">
     <span class="label ${over ? "overridden" : ""}">${esc(paramText(p, "label"))}</span>
@@ -1021,7 +1038,8 @@ function renderProfiles() {
           <input type="text" class="e-name" value="${esc(p.name)}">
           <textarea class="e-text" rows="3">${esc(p.ref_text)}</textarea>
           <p class="hint">${esc(t("vz.edit_hint"))}</p>
-          <div class="row"><button class="primary" data-vz="save-edit">${esc(t("btn.save"))}</button><button data-vz="cancel-edit">${esc(t("btn.cancel"))}</button></div>
+          <div class="row"><button class="primary" data-vz="save-edit">${esc(t("btn.save"))}</button><button data-vz="cancel-edit">${esc(t("btn.cancel"))}</button>
+            <button type="button" data-hints="tags" title="${esc(t("tip.tag_hints"))}" ${state?.tts_engine === "server" ? "" : "hidden"}>${esc(t("btn.tag_hints"))}</button></div>
         </div>` : `<div class="ref">“${esc(p.ref_text)}”</div>`}
       ${used[p.id] ? `<div class="tags">${used[p.id].map(tm =>
         `<span class="tag" style="--team:${tm === "default" ? "var(--muted)" : teamColor(tm)}">${tm === "default" ? esc(t("vz.default")) : esc(teamName(tm))}</span>`).join("")}</div>` : ""}
@@ -1127,6 +1145,91 @@ for (const box of ["#vzParams", "#vzParamsAdv"]) $(box).addEventListener("click"
   renderParams();
 });
 $("#vzScope").addEventListener("change", (e) => vzSetScope(e.target.value));
+
+// -- hint menus: the voice style terms and the speech tags, as the voice server's engine lists them
+
+const hintMenu = $("#hintMenu");
+let hintFor = null;  // {kind: "style" | "tags", field, button, lists}
+// the catalog names a term or tag when it has it; otherwise it shows as the engine wrote it
+const hintName = (key, fallback) => { const text = t(key); return text === key ? fallback : text; };
+const styleTerms = (value) => value.split(",").map(s => s.trim()).filter(Boolean);
+
+async function hintLists() {
+  if (vz.schema?.hints) return vz.schema.hints;
+  try { return (await api("/api/tts/schema")).hints || null; } catch { return null; }  // the Goblin tab, before the Voz tab loaded
+}
+
+function hintField(b) {
+  if (b.dataset.for) return $(`#${b.dataset.for}`);
+  const box = b.closest(".ctl, .edit");
+  return $("textarea", box) || $("input[type=text]", box);
+}
+
+async function openHints(b) {
+  if (hintFor?.button === b) return closeHints();
+  const lists = await hintLists();
+  if (!lists) return toast(t("hints.unavailable"), true);
+  if (!(b.dataset.hints === "style" ? lists.style : lists.tags)?.length) return toast(t("hints.none"), true);
+  hintFor = { kind: b.dataset.hints, field: hintField(b), button: b, lists };
+  renderHints();
+  hintMenu.hidden = false;
+  const r = b.getBoundingClientRect(), w = hintMenu.offsetWidth, h = hintMenu.offsetHeight;
+  hintMenu.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  hintMenu.style.top = `${r.bottom + 4 + h < innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4)}px`;
+}
+
+function closeHints() { hintMenu.hidden = true; hintFor = null; }
+
+function renderHints() {
+  const { kind, field, lists } = hintFor;
+  if (kind === "style") {
+    const chosen = new Set(styleTerms(field.value).map(s => s.toLowerCase()));
+    const note = vz.scope === "global" ? t("hints.style_note") : t("hints.style_note_profile");
+    hintMenu.innerHTML = `<h3>${esc(t("hints.style_title"))}</h3><p class="hint">${esc(note)}</p>` +
+      lists.style.map(k => `<h4>${esc(hintName(`style_kind.${k.kind}`, k.kind))}</h4><div class="chips">${k.terms.map(term =>
+        `<button type="button" class="${chosen.has(term) ? "on" : ""}" data-style-term="${esc(term)}" title="${esc(term)}">${esc(hintName(`style.${term.replace(/ /g, "_")}`, term))}</button>`).join("")}</div>`).join("");
+  } else {
+    hintMenu.innerHTML = `<h3>${esc(t("hints.tags_title"))}</h3><p class="hint">${esc(t("hints.tags_note"))}</p><div class="chips">` +
+      lists.tags.map(tag => `<button type="button" data-tag="${esc(tag)}">${esc(hintName(`tag.${tag.slice(1, -1)}`, tag))}<code>${esc(tag)}</code></button>`).join("") + "</div>";
+  }
+}
+
+// a term replaces the one of its kind already written; a term already written comes out
+function toggleStyleTerm(term) {
+  const { field, lists } = hintFor;
+  const kindTerms = lists.style.find(k => k.terms.includes(term)).terms;
+  const terms = styleTerms(field.value);
+  const had = terms.some(s => s.toLowerCase() === term);
+  const others = terms.filter(s => !kindTerms.includes(s.toLowerCase()));
+  field.value = (had ? others : [...others, term]).join(", ");
+  field.dispatchEvent(new Event("input", { bubbles: true }));  // the form sees it as typed
+}
+
+// a field nobody has clicked in yet has its cursor at the start: the tag goes at the end there
+const placedCursor = new WeakSet();
+document.addEventListener("focusin", (e) => placedCursor.add(e.target));
+
+function insertTag(tag) {
+  const { field } = hintFor;
+  const placed = placedCursor.has(field);
+  const start = placed ? field.selectionStart : field.value.length, end = placed ? field.selectionEnd : start;
+  const before = start > 0 && !/\s/.test(field.value[start - 1]) ? " " : "";
+  const after = end < field.value.length && !/\s/.test(field.value[end]) ? " " : "";
+  field.setRangeText(before + tag + after, start, end, "end");
+  field.focus();
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (b?.dataset.hints) { openHints(b); return; }
+  if (!hintFor) return;
+  if (!hintFor.field.isConnected) closeHints();  // its form was drawn again
+  else if (b?.dataset.styleTerm) { toggleStyleTerm(b.dataset.styleTerm); renderHints(); }
+  else if (b?.dataset.tag) insertTag(b.dataset.tag);
+  else if (!hintMenu.contains(e.target)) closeHints();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && hintFor) closeHints(); });
 $("#vzSave").addEventListener("click", vzSave);
 $("#vzSpeak").addEventListener("click", vzSpeak);
 $("#vzCreate").addEventListener("click", vzCreate);

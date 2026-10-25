@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+if TYPE_CHECKING:  # numpy is only needed to synthesize: the engine's lists load without it
+    import numpy as np
 
 
 @dataclass
@@ -69,6 +70,12 @@ class Engine:
 
     def params(self) -> list[Param]:
         return []
+
+    def hints(self) -> dict:
+        """What the panel's hint menus offer: "style" = the voice style terms, as [{"kind", "terms"}] with at
+        most one term of each kind in a voice style, written into the parameter named "style_param";
+        "tags" = the speech tags the text may carry."""
+        return {"style": [], "style_param": None, "tags": []}
 
     def transcribe(self, wav: Path) -> str:
         raise NotImplementedError
