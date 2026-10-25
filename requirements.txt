@@ -1,2 +1,3 @@
 aiohttp>=3.9
 pytest
+numpy                        # tests only: the voice server's engine (tests/test_voice_hints.py)
