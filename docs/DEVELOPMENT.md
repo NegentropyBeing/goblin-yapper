@@ -105,6 +105,7 @@ commands. `<time>` (team) is `azul`, `verde`, `roxo` or `amarelo`.
 | `autoremove <on\|off> [min]` | Remove from the queue and teams whoever writes nothing in chat for `min` minutes (only counts while the chat is connected) |
 | `autorotate <on\|off> [min]` | Pass the voice to another chatter of the same team every `min` minutes, once the current line ends |
 | `hideidle <on\|off>` | Each team's source hides its goblin while nobody on the team has the voice |
+| `volume <0-100>` | How loud the overlays (and the panel, as last-resort player) play the lines, in %; applies to the line playing too |
 | `channel <canal\|off>` | Connect to a channel's chat (name or pasted link), or disconnect |
 | `tint <time> <#rrggbb\|off> [0-1]` | Team goblin tint color and strength |
 | `teamvoice <time\|default> <perfil\|none>` | Voice profile a team speaks with (Voz tab) |

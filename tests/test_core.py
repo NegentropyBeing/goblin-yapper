@@ -602,6 +602,29 @@ def test_hideidle_toggle_is_saved_and_sent_to_overlays(tmp_path):
     asyncio.run(run())
 
 
+def test_volume_is_saved_clamped_and_sent_to_overlays(tmp_path):
+    async def run():
+        settings = tmp_path / "settings.json"
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}), settings_path=settings)
+        assert app.state()["volume"] == 100  # full by default
+        assert (await app.command("volume 40")).ok
+        assert app.state()["volume"] == 40
+        assert json.loads(settings.read_text(encoding="utf-8"))["overlay"] == {"volume": 40}
+        # kept on the next start
+        assert App({}, TTS({"engine": "dummy"}), settings_path=settings).state()["volume"] == 40
+        await app.command("volume 250")
+        assert app.state()["volume"] == 100
+        await app.command("volume -5")
+        assert app.state()["volume"] == 0
+        await app.command("volume 37,6%")
+        assert app.state()["volume"] == 38
+        for bad in ("volume", "volume loud", "volume nan", "volume inf"):
+            assert not (await app.command(bad)).ok
+        assert app.state()["volume"] == 38
+
+    asyncio.run(run())
+
+
 def test_chorus_every_team_voice_says_the_phrase_together():
     async def run():
         app, s = _app_with_overlays(main=(None, True), azul=("azul", True))

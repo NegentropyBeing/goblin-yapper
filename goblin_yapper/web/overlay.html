@@ -139,6 +139,10 @@ function render() {
   labelEl.classList.toggle("hidden", !showName);
 }
 
+// The panel's volume slider (state.volume, 0..100), also applied to the lines already playing.
+const volume = () => (state?.volume ?? 100) / 100;
+function applyVolume() { for (const line of lines.values()) if (line.audio) line.audio.volume = volume(); }
+
 function stopTalking(id) {
   const line = lines.get(id);
   if (!line) return;
@@ -155,6 +159,7 @@ function onSpeak(msg) {
   // otherwise the main one. Every overlay still gets the line, to animate its goblin if it's the speaker's.
   if (!PLAY_AUDIO || !msg.play) return;
   const audio = line.audio = new Audio(msg.url);
+  audio.volume = volume();
   audio.onended = () => { send({ type: "ended", id: msg.id }); stopTalking(msg.id); };
   audio.onerror = audio.onended;
   audio.play().catch(() => { unlockEl.style.display = "block"; audio.onended(); });
@@ -168,7 +173,7 @@ function connect() {
   ws.onopen = () => send({ type: "hello", role: PREVIEW ? "preview" : "overlay", team: PIN_TEAM, audio: PLAY_AUDIO });
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if (msg.type === "state") { state = msg; applyLanguage(); render(); }
+    if (msg.type === "state") { state = msg; applyLanguage(); applyVolume(); render(); }
     else if (msg.type === "speak") onSpeak(msg);
     else if (msg.type === "idle" || msg.type === "stop") stopTalking(msg.id);
     else if (msg.type === "assets") loadAssets();
