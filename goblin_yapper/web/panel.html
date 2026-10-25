@@ -52,6 +52,9 @@
   @keyframes pulse { to { transform: scale(1.2); } }
   #autobar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
   #autobar .auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  #autobar .volume { margin-left: auto; }
+  #autobar input[type=range] { width: 120px; accent-color: var(--accent); cursor: pointer; }
+  #autobar output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
   #autobar input[type=number] { width: 58px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; }
   #test { display: flex; gap: 6px; margin-left: auto; }
   #test input { width: 220px; }
@@ -242,6 +245,8 @@
   <span class="auto" data-i18n-title="tip.autorotate">
     <label class="toggle"><input type="checkbox" id="autoRotate"> <span data-i18n="opt.autorotate"></span></label>
     <input type="number" id="autoRotateMin" min="1" max="1440" step="1"> <span data-i18n="opt.autorotate_suffix"></span></span>
+  <label class="auto volume" data-i18n-title="tip.volume"><span data-i18n="opt.volume"></span>
+    <input type="range" id="volume" min="0" max="100" step="1"> <output id="volumeOut"></output></label>
 </section>
 
 <main id="board"></main>
@@ -386,6 +391,7 @@ async function cmd(command, { quiet = false } = {}) {
 const lines = new Map();
 function panelPlay(msg) {
   const audio = lines.get(msg.id).audio = new Audio(msg.url);
+  audio.volume = (state?.volume ?? 100) / 100;
   const done = () => { if (lines.get(msg.id)?.audio === audio) { lines.get(msg.id).audio = null; ws.send(JSON.stringify({ type: "ended", id: msg.id })); } };
   audio.onended = audio.onerror = done;
   audio.play().catch(done);
@@ -448,6 +454,9 @@ function render() {
   renderSpeakers();
   $("#multiVoice").checked = state.multi_voice;
   $("#hideIdle").checked = state.hide_idle;
+  if (document.activeElement !== $("#volume")) $("#volume").value = state.volume;
+  $("#volumeOut").textContent = `${$("#volume").value}%`;
+  for (const line of lines.values()) if (line.audio) line.audio.volume = state.volume / 100;
   $("#nextBtn").disabled = !state.voice.user;
   $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? t("btn.stop_all") : t("btn.stop_voice");
   renderLine();
@@ -631,6 +640,9 @@ document.addEventListener("click", async (e) => {
 
 $("#multiVoice").addEventListener("change", (e) => cmd(`multivoice ${e.target.checked ? "on" : "off"}`));
 $("#hideIdle").addEventListener("change", (e) => cmd(`hideidle ${e.target.checked ? "on" : "off"}`));
+// while dragging: just the number; on release: the overlays get the new volume (even mid-line)
+$("#volume").addEventListener("input", (e) => { $("#volumeOut").textContent = `${e.target.value}%`; });
+$("#volume").addEventListener("change", (e) => cmd(`volume ${e.target.value}`, { quiet: true }));
 for (const [id, command] of [["autoRemove", "autoremove"], ["autoRotate", "autorotate"]]) {
   const send = () => cmd(`${command} ${$(`#${id}`).checked ? "on" : "off"} ${$(`#${id}Min`).value}`.trim());
   $(`#${id}`).addEventListener("change", send);

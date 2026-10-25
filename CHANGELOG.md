@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Volume** slider (Goblin tab, next to the automatic options): how loud the goblins speak in OBS, and in the
+panel when no OBS source is open. Applies right away, even to the line playing, and is saved in `settings.json`
+(`overlay.volume`, 0–100, default 100). Command: `volume <0-100>`.
+
 ## v0.7.0
 
 Windows installers: `Goblin Yapper_0.7.0_x64_en-US.msi` (English) and `Goblin Yapper_0.7.0_x64_pt-BR.msi`

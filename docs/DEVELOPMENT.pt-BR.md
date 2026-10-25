@@ -105,6 +105,7 @@ comandos. `<time>` é `azul`, `verde`, `roxo` ou `amarelo`.
 | `autoremove <on\|off> [min]` | Tira da fila e dos times quem ficar `min` minutos sem escrever no chat (só conta com o chat conectado) |
 | `autorotate <on\|off> [min]` | Passa a voz para outra pessoa do mesmo time a cada `min` minutos, depois que a fala atual termina |
 | `hideidle <on\|off>` | A fonte de cada time esconde o goblin enquanto ninguém do time tem a voz |
+| `volume <0-100>` | Volume em % com que os overlays (e o painel, como último recurso) tocam as falas; vale também para a fala que está tocando |
 | `channel <canal\|off>` | Conecta ao chat de um canal (nome ou link colado) ou desconecta |
 | `tint <time> <#rrggbb\|off> [0-1]` | Cor e intensidade da tinta do goblin do time |
 | `teamvoice <time\|default> <perfil\|none>` | Perfil de voz com que um time fala (aba Voz) |

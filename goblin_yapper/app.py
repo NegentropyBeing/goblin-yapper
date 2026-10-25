@@ -112,6 +112,8 @@ class App:
         self.tints = load_tints(tcfg)
         # team (pinned) OBS sources hide their goblin while the team has nobody with the voice
         self.hide_idle = bool(self.cfg.get("overlay", {}).get("hide_idle", False))
+        # how loud the overlays (and the panel, as last-resort player) play the lines, 0..100 %
+        self.volume = max(0, min(100, int(self.cfg.get("overlay", {}).get("volume", 100))))
         # the language the operator reads the panel in; None until they choose (the panel then follows the system)
         language = self.cfg.get("ui", {}).get("language")
         self.language = language if language in LANGUAGES else None
@@ -185,6 +187,7 @@ class App:
             "speaking": self.speech.speaking.team if self.speech.speaking else None,
             "tints": self.tints,
             "hide_idle": self.hide_idle,
+            "volume": self.volume,
             "language": self.language,
             "chat": {"channel": self.channel, "status": self.chat_status},
             "tts_engine": self.tts.engine.name,
@@ -322,6 +325,7 @@ class App:
   autoremove <on|off> [min] remove from the queue/teams whoever stays [min] minutes without chatting
   autorotate <on|off> [min] pass the voice to another person on the team every [min] minutes
   hideidle <on|off>         hide the goblin of a team with nobody holding the voice
+  volume <0-100>            how loud the goblins speak (%)
   channel <channel|off>     connect to another channel's chat
   tint <team> <#color|off> [strength 0-1]   change a team goblin's tint
   teamvoice <team|default> <profile|none>   a team's voice profile (Voice tab)
@@ -500,6 +504,15 @@ class App:
             self.hide_idle = args[0].lower() == "on"
             self.persist({"overlay": {"hide_idle": self.hide_idle}})
             return Message("msg.hideidle_on" if self.hide_idle else "msg.hideidle_off")
+        if cmd == "volume":
+            need(1, "volume <0-100>")
+            try:
+                volume = round(float(args[0].rstrip("%").replace(",", ".")))
+            except (ValueError, OverflowError):
+                raise SorterError("err.usage", usage="volume <0-100>")
+            self.volume = max(0, min(100, volume))
+            self.persist({"overlay": {"volume": self.volume}})
+            return Message("msg.volume", {"volume": self.volume})
         if cmd in ("autoremove", "autorotate"):
             opt, section, key = ((self.inactive, "teams", "inactive") if cmd == "autoremove"
                                  else (self.rotate, "voice", "rotate"))

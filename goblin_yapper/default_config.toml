@@ -36,6 +36,7 @@ rotate_minutes = 5
 
 [overlay]
 hide_idle = false            # fontes de time escondem o goblin enquanto o time está sem voz (também no painel)
+volume = 100                 # volume das falas, 0..100 % (também no painel)
 
 [server]
 host = "127.0.0.1"
