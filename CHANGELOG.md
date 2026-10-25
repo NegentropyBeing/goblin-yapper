@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Hint menus for the voice (Voice tab).** The **＋** next to *Voice style* lists the voice style terms OmniVoice
+understands (gender, age, pitch, whisper, English accent), named in the interface language; a term replaces the
+one of its kind, and clicking a chosen term removes it. **＋ tag** (Goblin and Voice test boxes, profile
+transcript) inserts a speech tag such as `[laughter]` at the cursor. The lists come from the engine: the voice
+server's `GET /schema` now carries `hints` (`style`, `style_param`, `tags`).
+- The voice style still only applies without a voice profile: tried together with a cloned voice, it had no
+measurable effect on pitch or whispering.
+
 ## v0.7.1
 
 Windows installers: `Goblin Yapper_0.7.1_x64_en-US.msi` (English) and `Goblin Yapper_0.7.1_x64_pt-BR.msi`

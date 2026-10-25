@@ -55,7 +55,8 @@ Requirements:
 | `!leavesort` | Leave the queue or team. |
 
 Whoever has the voice doesn't type a command: their normal messages are read. Messages starting with `!`, links
-and emotes are skipped, and at most 5 messages wait in line; the rest are dropped.
+and emotes are skipped, and at most 5 messages wait in line; the rest are dropped. Speech tags work in chat too:
+`that was close [laughter]` makes the goblin laugh.
 
 ### OBS
 
@@ -89,6 +90,11 @@ In the **Voice** tab, drop a `.wav` of the voice to clone. The app prepares the 
 transcribes it with Whisper, and you review the transcript before creating the profile. You can test lines,
 tune every OmniVoice parameter (language, speed, ...) for all profiles or just one, and pick each team's voice.
 Windows voices are also available as an alternative.
+
+**Voice style and speech tags.** The **＋** next to *Voice style* lists the terms OmniVoice understands (gender,
+age, pitch, whisper, English accent), one of each kind; it only takes effect on lines spoken without a voice
+profile. **＋ tag** next to the test boxes and the transcript inserts a speech tag such as `[laughter]` or `[sigh]`,
+which the voice turns into the sound.
 
 **Only clone voices with the speaker's permission.**
 

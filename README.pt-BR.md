@@ -55,7 +55,8 @@ Requisitos:
 | `!leavesort` | Sai da fila ou do time. |
 
 Quem está com a voz não digita comando: as mensagens normais são lidas. Mensagens que começam com `!`, links e
-emotes não são lidos, e no máximo 5 mensagens ficam esperando; o resto é descartado.
+emotes não são lidos, e no máximo 5 mensagens ficam esperando; o resto é descartado. As tags de fala também
+funcionam no chat: `essa foi por pouco [laughter]` faz o goblin rir.
 
 ### OBS
 
@@ -89,6 +90,11 @@ Na aba **Voz**, arraste um `.wav` com a voz a clonar. O app prepara o áudio (co
 transcreve com o Whisper, e você revisa a transcrição antes de criar o perfil. Dá para testar frases, ajustar
 todos os parâmetros do OmniVoice (idioma, velocidade, ...) para todos os perfis ou para um só, e escolher a voz
 de cada time. As vozes do Windows também estão disponíveis como alternativa.
+
+**Estilo de voz e tags de fala.** O **＋** ao lado de *Estilo de voz* lista os termos que o OmniVoice entende
+(gênero, idade, tom, sussurro, sotaque em inglês), um de cada tipo; ele só tem efeito nas falas sem perfil de voz.
+O **＋ tag** ao lado das caixas de teste e da transcrição insere uma tag de fala como `[laughter]` ou `[sigh]`, que a
+voz transforma no som.
 
 **Só clone vozes com a permissão de quem fala.**
 

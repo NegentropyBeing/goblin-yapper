@@ -6,6 +6,7 @@ Runs in its own Python environment (PyTorch + the TTS engine), started by the ap
 
   GET    /status                          state: loading | ready | error, plus GPU/VRAM info
   GET    /schema                          engine name + parameter definitions (the panel builds its form from it)
+                                          + hints: voice style terms and speech tags for the panel's menus
   GET    /settings   PUT /settings        global parameter defaults {"params": {...}}
   GET    /profiles                        voice profiles
   POST   /pipeline/prepare                raw audio body -> cleaned reference draft (?trim=1&normalize=1&max_seconds=20)
@@ -125,7 +126,8 @@ def make_app(srv: TTSServer) -> web.Application:
     async def schema(_):
         return web.json_response({"engine": srv.engine.name, "label": srv.engine.label,
                                   "sample_rate": srv.engine.sample_rate,
-                                  "params": [p.to_json() for p in srv.engine.params()]})
+                                  "params": [p.to_json() for p in srv.engine.params()],
+                                  "hints": srv.engine.hints()})
 
     @routes.get("/settings")
     async def get_settings(_):

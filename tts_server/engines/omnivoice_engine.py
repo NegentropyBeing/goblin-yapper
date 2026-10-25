@@ -6,10 +6,12 @@ from __future__ import annotations
 import gc
 import logging
 from pathlib import Path
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 from .base import Engine, Param
+
+if TYPE_CHECKING:
+    import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +19,18 @@ GEN_CONFIG_KEYS = ("num_step", "guidance_scale", "t_shift", "layer_penalty_facto
                    "class_temperature", "denoise", "postprocess_output", "audio_chunk_duration",
                    "audio_chunk_threshold", "pad_duration", "fade_duration")
 PINNED_LANGS = ("pt", "en", "es")
+# omnivoice.utils.voice_design: the voice style terms, one of each kind (the Chinese dialects are left out:
+# they only work in Chinese text), and omnivoice.models.omnivoice: the speech tags
+STYLE_TERMS = (
+    ("gender", ("male", "female")),
+    ("age", ("child", "teenager", "young adult", "middle-aged", "elderly")),
+    ("pitch", ("very low pitch", "low pitch", "moderate pitch", "high pitch", "very high pitch")),
+    ("style", ("whisper",)),
+    ("accent", ("american accent", "australian accent", "british accent", "canadian accent", "chinese accent",
+                "indian accent", "japanese accent", "korean accent", "portuguese accent", "russian accent")),
+)
+SPEECH_TAGS = ("laughter", "sigh", "confirmation-en", "question-en", "question-ah", "question-oh", "question-ei",
+               "question-yi", "surprise-ah", "surprise-oh", "surprise-wa", "surprise-yo", "dissatisfaction-hnn")
 
 
 class OmniVoiceEngine(Engine):
@@ -89,6 +103,10 @@ class OmniVoiceEngine(Engine):
             Param("fade_duration", "Fade (s)", "float", 0.1, group="advanced", min=0.0, max=1.0, step=0.05),
         ]
 
+    def hints(self) -> dict:
+        return {"style": [{"kind": kind, "terms": list(terms)} for kind, terms in STYLE_TERMS], "style_param": "instruct",
+                "tags": [f"[{tag}]" for tag in SPEECH_TAGS]}
+
     # ---- profiles ------------------------------------------------------
 
     def transcribe(self, wav: Path) -> str:
@@ -148,7 +166,7 @@ class OmniVoiceEngine(Engine):
         speed = params.get("speed")
         if cache is not None:
             kwargs["voice_clone_prompt"] = self._prompt(cache)
-        elif params.get("instruct"):
+        elif params.get("instruct"):  # the voice style: with a cloned voice it has no measurable effect
             kwargs["instruct"] = params["instruct"]
         try:
             audio = self.model.generate(
@@ -160,4 +178,6 @@ class OmniVoiceEngine(Engine):
             )
         finally:
             self._trim()
+        import numpy as np
+
         return np.asarray(audio[0], dtype=np.float32)
