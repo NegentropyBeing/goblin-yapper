@@ -37,6 +37,11 @@ def normalize_channel(raw: str) -> str:
     return c.split("/")[0].split("?")[0].lstrip("#@")
 
 DEFAULT_TINTS = {"azul": "#3b82f6", "verde": "#22c55e", "roxo": "#a855f7", "amarelo": "#facc15"}
+GIF_SPEED_RANGE = (25, 400)  # % of the gif's own speed
+
+
+def clamp_gif_speed(speed) -> int:
+    return max(GIF_SPEED_RANGE[0], min(GIF_SPEED_RANGE[1], int(speed)))
 
 
 def load_tints(tcfg: dict) -> dict[str, dict]:
@@ -114,6 +119,8 @@ class App:
         self.hide_idle = bool(self.cfg.get("overlay", {}).get("hide_idle", False))
         # how loud the overlays (and the panel, as last-resort player) play the lines, 0..100 %
         self.volume = max(0, min(100, int(self.cfg.get("overlay", {}).get("volume", 100))))
+        # how fast the talking gif (and the built-in goblin) animates, in % of its own speed
+        self.gif_speed = clamp_gif_speed(self.cfg.get("overlay", {}).get("gif_speed", 100))
         # the language the operator reads the panel in; None until they choose (the panel then follows the system)
         language = self.cfg.get("ui", {}).get("language")
         self.language = language if language in LANGUAGES else None
@@ -188,6 +195,7 @@ class App:
             "tints": self.tints,
             "hide_idle": self.hide_idle,
             "volume": self.volume,
+            "gif_speed": self.gif_speed,
             "language": self.language,
             "chat": {"channel": self.channel, "status": self.chat_status},
             "tts_engine": self.tts.engine.name,
@@ -326,6 +334,7 @@ class App:
   autorotate <on|off> [min] pass the voice to another person on the team every [min] minutes
   hideidle <on|off>         hide the goblin of a team with nobody holding the voice
   volume <0-100>            how loud the goblins speak (%)
+  gifspeed <25-400>         how fast the talking gif animates (% of its own speed)
   channel <channel|off>     connect to another channel's chat
   tint <team> <#color|off> [strength 0-1]   change a team goblin's tint
   teamvoice <team|default> <profile|none>   a team's voice profile (Voice tab)
@@ -513,6 +522,15 @@ class App:
             self.volume = max(0, min(100, volume))
             self.persist({"overlay": {"volume": self.volume}})
             return Message("msg.volume", {"volume": self.volume})
+        if cmd == "gifspeed":
+            need(1, "gifspeed <25-400>")
+            try:
+                speed = round(float(args[0].rstrip("%").replace(",", ".")))
+            except (ValueError, OverflowError):
+                raise SorterError("err.usage", usage="gifspeed <25-400>")
+            self.gif_speed = clamp_gif_speed(speed)
+            self.persist({"overlay": {"gif_speed": self.gif_speed}})
+            return Message("msg.gif_speed", {"speed": self.gif_speed})
         if cmd in ("autoremove", "autorotate"):
             opt, section, key = ((self.inactive, "teams", "inactive") if cmd == "autoremove"
                                  else (self.rotate, "voice", "rotate"))

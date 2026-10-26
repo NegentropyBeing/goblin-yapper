@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Gif speed** slider (**OBS overlay and goblin images**, next to the *Goblin images* heading): plays the talking gif faster or slower in OBS, from 25% to
+400% of its own speed; the built-in goblin follows it too. The server rescales the gif's frame delays
+(`/assets/<file>.gif?speed=150`); the setting is saved in `settings.json` (`overlay.gif_speed`, default 100).
+Command: `gifspeed <25-400>`. Browsers don't show a frame for less than 20 ms, so a gif that is already that fast can't go faster.
 - **Hint menus for the voice (Voice tab).** The **＋** next to *Voice style* lists the voice style terms OmniVoice
 understands (gender, age, pitch, whisper, English accent), named in the interface language; a term replaces the
 one of its kind, and clicking a chosen term removes it. **＋ tag** (Goblin and Voice test boxes, profile

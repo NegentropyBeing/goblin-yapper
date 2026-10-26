@@ -93,6 +93,11 @@
   #drawer summary { padding: 9px 16px; cursor: pointer; color: var(--muted); }
   .drawer-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 4px 16px 14px; }
   .drawer-body h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .images-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; margin-bottom: 8px; }
+  .images-head h3 { margin: 0; }
+  .gif-speed { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .gif-speed input[type=range] { width: 120px; accent-color: var(--accent); cursor: pointer; }
+  .gif-speed output { min-width: 3.2em; font-variant-numeric: tabular-nums; }
   .urls { display: flex; flex-direction: column; gap: 5px; }
   .url { display: flex; gap: 6px; align-items: center; }
   .url code { flex: 1; background: var(--bg); padding: 5px 8px; border-radius: 6px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -274,7 +279,11 @@
       <div class="pill" id="dataInfo"></div>
     </div>
     <div>
-      <h3 data-i18n="drawer.images"></h3>
+      <div class="images-head">
+        <h3 data-i18n="drawer.images"></h3>
+        <label class="gif-speed" data-i18n-title="tip.gif_speed"><span data-i18n="opt.gif_speed"></span>
+          <input type="range" id="gifSpeed" min="25" max="400" step="25"> <output id="gifSpeedOut"></output></label>
+      </div>
       <p class="hint" style="margin:0 0 8px" data-i18n="drawer.images_hint"></p>
       <div id="uploads"></div>
     </div>
@@ -472,6 +481,8 @@ function render() {
   document.querySelectorAll("[data-hints=tags]").forEach(b => { b.hidden = state.tts_engine !== "server"; });
   if (document.activeElement !== $("#volume")) $("#volume").value = state.volume;
   $("#volumeOut").textContent = `${$("#volume").value}%`;
+  if (document.activeElement !== $("#gifSpeed")) $("#gifSpeed").value = state.gif_speed;
+  $("#gifSpeedOut").textContent = `${$("#gifSpeed").value}%`;
   for (const line of lines.values()) if (line.audio) line.audio.volume = state.volume / 100;
   $("#nextBtn").disabled = !state.voice.user;
   $("#stopAllBtn").textContent = state.multi_voice && state.speakers.length > 1 ? t("btn.stop_all") : t("btn.stop_voice");
@@ -659,6 +670,8 @@ $("#hideIdle").addEventListener("change", (e) => cmd(`hideidle ${e.target.checke
 // while dragging: just the number; on release: the overlays get the new volume (even mid-line)
 $("#volume").addEventListener("input", (e) => { $("#volumeOut").textContent = `${e.target.value}%`; });
 $("#volume").addEventListener("change", (e) => cmd(`volume ${e.target.value}`, { quiet: true }));
+$("#gifSpeed").addEventListener("input", (e) => { $("#gifSpeedOut").textContent = `${e.target.value}%`; });
+$("#gifSpeed").addEventListener("change", (e) => cmd(`gifspeed ${e.target.value}`, { quiet: true }));
 for (const [id, command] of [["autoRemove", "autoremove"], ["autoRotate", "autorotate"]]) {
   const send = () => cmd(`${command} ${$(`#${id}`).checked ? "on" : "off"} ${$(`#${id}Min`).value}`.trim());
   $(`#${id}`).addEventListener("change", send);

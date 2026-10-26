@@ -36,8 +36,9 @@
      Talking: the closed frown is swapped for an open mouth that yaps, and the head bobs. */
   .ph .mouth-open { opacity: 0; transform-origin: 631px 772px; transform: scaleY(.3); }
   .ph.talking .mouth-closed { opacity: 0; }
-  .ph.talking .mouth-open { opacity: 1; animation: yap .16s infinite alternate ease-in-out; }
-  .ph.talking .head { animation: bob .32s infinite alternate ease-in-out; transform-origin: 630px 890px; }
+  /* --speed: the panel's gif speed (1 = normal) */
+  .ph.talking .mouth-open { opacity: 1; animation: yap calc(.16s / var(--speed, 1)) infinite alternate ease-in-out; }
+  .ph.talking .head { animation: bob calc(.32s / var(--speed, 1)) infinite alternate ease-in-out; transform-origin: 630px 890px; }
   @keyframes yap { to { transform: scaleY(1); } }
   @keyframes bob { to { transform: rotate(3deg) translateY(-10px); } }
   #unlock { position: absolute; top: 8px; left: 8px; padding: 6px 10px; background: #000c; color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; display: none; }
@@ -114,10 +115,13 @@ function render() {
   const tint = state?.tints?.[team];  // {color, strength}; none for the "default" goblin
   const color = tint?.color || "#7fbf3f";
   const strength = tint?.strength ?? 0;
-  const key = `${team}|${talking}|${color}|${strength}|${a.idle}|${a.talk}`;
+  const speed = state?.gif_speed ?? 100;  // % of the gif's own speed; the server rescales the frame delays
+  goblinEl.style.setProperty("--speed", speed / 100);
+  const key = `${team}|${talking}|${color}|${strength}|${a.idle}|${a.talk}|${speed}`;
   if (team && key !== renderedKey) {  // a hidden goblin keeps its last image while it fades out
     renderedKey = key;
-    const src = talking ? (a.talk || a.idle) : (a.idle || a.talk);
+    let src = talking ? (a.talk || a.idle) : (a.idle || a.talk);
+    if (src?.split("?")[0].endsWith(".gif") && speed !== 100) src += `&speed=${speed}`;
     if (src) {
       const layer = strength > 0
         ? `<div class="tint" style="background:${color};opacity:${strength};-webkit-mask-image:url('${src}');mask-image:url('${src}')"></div>` : "";

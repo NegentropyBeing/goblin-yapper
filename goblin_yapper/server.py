@@ -8,6 +8,7 @@
   GET    /api/assets           goblin images per team
   PUT    /api/assets/<file>    upload goblin.png / goblin.gif / <team>.png / <team>.gif (raw body)
   DELETE /api/assets/<file>
+  GET    /assets/<file>.gif?speed=150   a goblin gif played at 150 % of its speed (frame delays rescaled)
   WS     /ws                   pushes state/speak/idle/stop/assets; accepts {"type": "ended", "id": n} and an
                                overlay's {"type": "hello", "role": "overlay", "team": ..., "audio": bool}.
                                "speak" carries play=true for the one overlay that should play the audio.
@@ -48,6 +49,34 @@ def fail(error_class, key_or_error, **params):
         key = key_or_error
     body = {"key": key, "params": params, "text": render(key, params)}
     return error_class(text=json.dumps(body), content_type="application/json")
+
+
+def retime_gif(data: bytes, speed: float) -> bytes:
+    """The gif with every frame delay divided by `speed` (2 = twice as fast). Browsers play a delay under
+    2 centiseconds as 10, so delays never go below 2 (and an unset delay counts as the 10 it plays at)."""
+    if speed == 1 or data[:4] != b"GIF8" or len(data) < 13:
+        return data
+    out = bytearray(data)
+    i = 13 + ((3 << ((data[10] & 7) + 1)) if data[10] & 0x80 else 0)  # header + screen descriptor + global colors
+
+    def skip_sub_blocks(i):
+        while i < len(data) and data[i]:
+            i += data[i] + 1
+        return i + 1
+
+    while i < len(data):
+        if data[i] == 0x21:  # extension
+            if data[i + 1] == 0xF9 and i + 6 <= len(data):  # graphic control: the frame delay
+                delay = int.from_bytes(data[i + 4:i + 6], "little")
+                delay = max(2, round((delay if delay >= 2 else 10) / speed))
+                out[i + 4:i + 6] = min(delay, 0xFFFF).to_bytes(2, "little")
+            i = skip_sub_blocks(i + 2)
+        elif data[i] == 0x2C:  # image: descriptor, local colors, LZW code size, pixel data
+            flags = data[i + 9] if i + 9 < len(data) else 0
+            i = skip_sub_blocks(i + 11 + ((3 << ((flags & 7) + 1)) if flags & 0x80 else 0))
+        else:  # trailer (or garbage)
+            break
+    return bytes(out)
 
 
 def find_assets(assets_dir: Path) -> dict:
@@ -107,6 +136,19 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         path.write_bytes(data)
         await app.broadcast({"type": "assets"})
         return web.json_response({"ok": True})
+
+    async def gif(request):
+        name = f"{request.match_info['stem'].lower()}.gif"
+        path = assets_dir / name
+        if name not in ASSET_FILES or not path.exists():
+            raise web.HTTPNotFound()
+        try:
+            speed = float(request.query.get("speed", 100)) / 100
+        except ValueError:
+            speed = 1
+        if not 0.1 <= speed <= 10:
+            speed = 1
+        return web.Response(body=retime_gif(path.read_bytes(), speed), content_type="image/gif")
 
     async def delete_asset(request):
         asset_path(request).unlink(missing_ok=True)
@@ -207,6 +249,7 @@ def make_web_app(app: App, assets_dir: Path) -> web.Application:
         web.post("/api/tts-service/start", service_action("start")),
         web.post("/api/tts-service/install", tts_service_install),
         web.route("*", "/api/tts/{tail:.*}", tts_proxy),
+        web.get("/assets/{stem}.gif", gif),
         web.static("/assets", assets_dir),
         web.static("/web", WEB_DIR),
     ])

@@ -625,6 +625,25 @@ def test_volume_is_saved_clamped_and_sent_to_overlays(tmp_path):
     asyncio.run(run())
 
 
+def test_gif_speed_is_saved_and_clamped(tmp_path):
+    async def run():
+        settings = tmp_path / "settings.json"
+        app = App({"teams": {"count": 2}}, TTS({"engine": "dummy"}), settings_path=settings)
+        assert app.state()["gif_speed"] == 100  # the gif's own speed by default
+        assert (await app.command("gifspeed 150")).ok
+        assert json.loads(settings.read_text(encoding="utf-8"))["overlay"] == {"gif_speed": 150}
+        assert App({}, TTS({"engine": "dummy"}), settings_path=settings).state()["gif_speed"] == 150
+        await app.command("gifspeed 1000")
+        assert app.state()["gif_speed"] == 400
+        await app.command("gifspeed 5%")
+        assert app.state()["gif_speed"] == 25
+        for bad in ("gifspeed", "gifspeed fast", "gifspeed inf"):
+            assert not (await app.command(bad)).ok
+        assert app.state()["gif_speed"] == 25
+
+    asyncio.run(run())
+
+
 def test_chorus_every_team_voice_says_the_phrase_together():
     async def run():
         app, s = _app_with_overlays(main=(None, True), azul=("azul", True))
